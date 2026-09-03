@@ -15,7 +15,42 @@ import {
   PaymentVoucher,
 } from '../types';
 
-export const initialBusinessProfile: BusinessProfile = {
+export const blankBusinessProfile: BusinessProfile = {
+  companyName: '',
+  tradingName: '',
+  email: '',
+  phone: '',
+  website: '',
+  taxNumber: '',
+  address: {
+    street: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: '',
+  },
+  defaultCurrency: 'USD',
+  defaultTaxRate: 10.0,
+  fiscalYearStartMonth: 1,
+  paymentInstructions: '',
+  bankDetails: {
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    routingOrIban: '',
+    swiftBic: '',
+  },
+  invoicePrefix: 'INV-2026-',
+  invoiceNextNumber: 1001,
+  billPrefix: 'BILL-2026-',
+  billNextNumber: 501,
+  enableInventory: true,
+  businessType: 'general',
+  enableAIAutomation: true,
+  enablePredictiveAnalytics: true,
+};
+
+export const defaultDemoBusinessProfile: BusinessProfile = {
   companyName: 'Apex Enterprise Ledger',
   tradingName: 'Apex Enterprise',
   email: 'finance@apexenterprise.com',
@@ -49,6 +84,8 @@ export const initialBusinessProfile: BusinessProfile = {
   enableAIAutomation: true,
   enablePredictiveAnalytics: true,
 };
+
+export const initialBusinessProfile: BusinessProfile = blankBusinessProfile;
 
 export const initialVendors: Vendor[] = [
   {
@@ -745,7 +782,7 @@ export const initialPaymentVouchers: PaymentVoucher[] = [
   },
 ];
 
-export const initialAuthUser: AuthUser = {
+export const defaultDemoAuthUser: AuthUser = {
   id: 'usr-admin-1',
   name: 'Alex Vance',
   email: 'alex.vance@apexenterprise.com',
@@ -754,6 +791,8 @@ export const initialAuthUser: AuthUser = {
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
   lastLoginAt: new Date().toISOString(),
 };
+
+export const initialAuthUser: AuthUser | null = null;
 
 export const initialSecuritySettings: SecuritySettings = {
   autoLockMinutes: 15,

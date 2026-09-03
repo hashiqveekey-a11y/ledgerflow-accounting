@@ -37,6 +37,8 @@ import {
 } from '../types';
 import {
   initialBusinessProfile,
+  blankBusinessProfile,
+  defaultDemoBusinessProfile,
   initialClients,
   initialVendors,
   initialInvoices,
@@ -46,6 +48,7 @@ import {
   initialAutomationLogs,
   initialLedgerAccounts,
   initialAuthUser,
+  defaultDemoAuthUser,
   initialSecuritySettings,
   initialInventoryItems,
   initialInventoryMovements,
@@ -77,6 +80,15 @@ interface AccountingContextType {
   login: (email: string, pinOrPass: string) => boolean;
   loginWithPin: (pin: string) => boolean;
   quickDemoLogin: () => void;
+  registerCompanyAndUser: (
+    profile: Partial<BusinessProfile>,
+    user: {
+      name: string;
+      email: string;
+      role?: 'CFO / Administrator' | 'Lead Accountant' | 'Financial Analyst' | 'Auditor';
+      pin: string;
+    }
+  ) => void;
   lockSession: () => void;
   unlockSession: (pinOrPass: string) => boolean;
   logout: () => void;
@@ -247,33 +259,65 @@ interface AccountingContextType {
   setDaybookFilterDate: (date: string) => void;
 }
 
-const STORAGE_KEY_PREFIX = 'ledgerflow_accounting_v2_';
+const STORAGE_KEY_PREFIX = 'ledgerflow_accounting_v3_';
 
 const AccountingContext = createContext<AccountingContextType | undefined>(undefined);
 
 export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Clear any legacy storage on startup to ensure a clean slate
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const legacyPrefixes = ['ledgerflow_accounting_v1_', 'ledgerflow_accounting_v2_'];
+        legacyPrefixes.forEach((prefix) => {
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith(prefix)) {
+              localStorage.removeItem(key);
+            }
+          });
+        });
+      }
+    } catch {}
+  }, []);
+
   // Auth State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}auth_user`);
-    return saved ? JSON.parse(saved) : initialAuthUser;
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}auth_user`);
+      return saved ? JSON.parse(saved) : initialAuthUser;
+    } catch {
+      return initialAuthUser;
+    }
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}is_auth`);
-    return saved !== null ? JSON.parse(saved) : true;
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}is_auth`);
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
   });
 
   const [isSessionLocked, setIsSessionLocked] = useState<boolean>(false);
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}sec_settings`);
-    return saved ? JSON.parse(saved) : initialSecuritySettings;
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}sec_settings`);
+      return saved ? JSON.parse(saved) : initialSecuritySettings;
+    } catch {
+      return initialSecuritySettings;
+    }
   });
 
   // Business Data
   const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}profile`);
-    return saved ? JSON.parse(saved) : initialBusinessProfile;
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}profile`);
+      return saved ? JSON.parse(saved) : initialBusinessProfile;
+    } catch {
+      return initialBusinessProfile;
+    }
   });
 
   const [clients, setClients] = useState<Client[]>(() => {
@@ -281,10 +325,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}clients`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialClients;
+    return [];
   });
 
   const [vendors, setVendors] = useState<Vendor[]>(() => {
@@ -292,10 +336,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}vendors`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialVendors;
+    return [];
   });
 
   const [invoices, setInvoices] = useState<Invoice[]>(() => {
@@ -303,10 +347,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}invoices`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialInvoices;
+    return [];
   });
 
   const [purchaseInvoices, setPurchaseInvoices] = useState<PurchaseInvoice[]>(() => {
@@ -314,10 +358,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}purchase_invoices`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialPurchaseInvoices;
+    return [];
   });
 
   const [expenses, setExpenses] = useState<Expense[]>(() => {
@@ -325,10 +369,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}expenses`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialExpenses;
+    return [];
   });
 
   const [bankTransactions, setBankTransactions] = useState<BankTransaction[]>(() => {
@@ -336,10 +380,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}transactions`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialBankTransactions;
+    return [];
   });
 
   const [automationLogs, setAutomationLogs] = useState<AutomationLog[]>(() => {
@@ -350,7 +394,7 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
         if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialAutomationLogs;
+    return [];
   });
 
   const [ledgerAccounts, setLedgerAccounts] = useState<LedgerAccount[]>(() => {
@@ -369,10 +413,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}inventory_items`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialInventoryItems;
+    return [];
   });
 
   const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>(() => {
@@ -380,10 +424,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}inventory_movements`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialInventoryMovements;
+    return [];
   });
 
   const [paymentVouchers, setPaymentVouchers] = useState<PaymentVoucher[]>(() => {
@@ -391,10 +435,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}payment_vouchers`);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return initialPaymentVouchers;
+    return [];
   });
 
   // UI State
@@ -592,8 +636,8 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
   const login = (email: string, pinOrPass: string): boolean => {
     if (!currentUser) {
       setCurrentUser({
-        ...initialAuthUser,
-        email: email || initialAuthUser.email,
+        ...defaultDemoAuthUser,
+        email: email || defaultDemoAuthUser.email,
         lastLoginAt: new Date().toISOString(),
       });
     } else {
@@ -609,8 +653,11 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   const loginWithPin = (pin: string): boolean => {
-    const validPin = currentUser?.pin || initialAuthUser.pin;
+    const validPin = currentUser?.pin || '1234';
     if (pin === validPin || pin === '1234') {
+      if (!currentUser) {
+        setCurrentUser(defaultDemoAuthUser);
+      }
       setIsAuthenticated(true);
       setIsSessionLocked(false);
       showNotification('PIN verified. Access granted.', 'success');
@@ -621,10 +668,42 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   const quickDemoLogin = () => {
-    setCurrentUser(initialAuthUser);
+    setBusinessProfile(defaultDemoBusinessProfile);
+    setCurrentUser(defaultDemoAuthUser);
     setIsAuthenticated(true);
     setIsSessionLocked(false);
-    showNotification('Signed in as CFO Administrator.', 'success');
+    showNotification('Signed in to sample company (Apex Enterprise) as Administrator.', 'success');
+  };
+
+  const registerCompanyAndUser = (
+    profile: Partial<BusinessProfile>,
+    user: {
+      name: string;
+      email: string;
+      role?: 'CFO / Administrator' | 'Lead Accountant' | 'Financial Analyst' | 'Auditor';
+      pin: string;
+    }
+  ) => {
+    const newProfile: BusinessProfile = {
+      ...blankBusinessProfile,
+      ...profile,
+      companyName: profile.companyName || 'My Company',
+      tradingName: profile.tradingName || profile.companyName || 'My Company',
+    };
+    const newUser: AuthUser = {
+      id: `usr-${Date.now()}`,
+      name: user.name || 'Administrator',
+      email: user.email,
+      role: user.role || 'CFO / Administrator',
+      pin: user.pin || '1234',
+      lastLoginAt: new Date().toISOString(),
+    };
+
+    setBusinessProfile(newProfile);
+    setCurrentUser(newUser);
+    setIsAuthenticated(true);
+    setIsSessionLocked(false);
+    showNotification(`Welcome to LedgerFlow! ${newProfile.companyName} ledger is initialized.`, 'success');
   };
 
   const lockSession = () => {
@@ -633,7 +712,7 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
   };
 
   const unlockSession = (pinOrPass: string): boolean => {
-    const validPin = currentUser?.pin || initialAuthUser.pin;
+    const validPin = currentUser?.pin || '1234';
     if (pinOrPass === validPin || pinOrPass === '1234' || pinOrPass.length >= 4) {
       setIsSessionLocked(false);
       showNotification('Session unlocked.', 'success');
@@ -689,6 +768,150 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
     inventoryMovements,
     ledgerAccounts
   );
+
+  // ModelContext tool registration effect
+  useEffect(() => {
+    const registerAccountingTool = () => {
+      // Check document or window for modelContext
+      const docCtx = typeof document !== 'undefined' ? (document as any).modelContext : null;
+      const winCtx = typeof window !== 'undefined' ? (window as any).modelContext : null;
+      const ctx = docCtx || winCtx;
+
+      if (!ctx) return false;
+
+      const accountingTool = {
+        name: 'accounting_tool',
+        description:
+          'Real-time double-entry accrual accounting system tool for managing invoices, expenses, financial reports (P&L, Balance Sheet, Cash Flow, AR/AP Aging), client ledgers, and database storage.',
+        parameters: {
+          type: 'object',
+          properties: {
+            action: {
+              type: 'string',
+              enum: [
+                'get_financial_summary',
+                'get_profit_and_loss',
+                'get_balance_sheet',
+                'get_cash_flow',
+                'list_invoices',
+                'list_clients',
+                'list_expenses',
+                'list_vendors',
+                'clear_all_data',
+                'reset_demo_data',
+              ],
+              description: 'The accounting operation to perform.',
+            },
+            payload: {
+              type: 'object',
+              description: 'Optional arguments or payload for the selected action.',
+            },
+          },
+          required: ['action'],
+        },
+        execute: async (args: { action: string; payload?: Record<string, any> }) => {
+          const { action } = args;
+          switch (action) {
+            case 'get_financial_summary':
+              return {
+                totalRevenue: profitAndLoss.totalRevenue,
+                totalExpenses: profitAndLoss.totalExpenses,
+                netIncome: profitAndLoss.netIncome,
+                netMargin: profitAndLoss.netProfitMarginPercentage,
+                cashBalance: balanceSheet.assets.currentAssets.cashAndEquivalents,
+                accountsReceivable: balanceSheet.assets.currentAssets.accountsReceivable,
+                accountsPayable: balanceSheet.liabilities.currentLiabilities.accountsPayable,
+                inventoryValue: balanceSheet.assets.currentAssets.inventoryValuation,
+                runwayMonths: cashFlow.runwayMonths,
+                currency: selectedCurrency,
+              };
+            case 'get_profit_and_loss':
+              return profitAndLoss;
+            case 'get_balance_sheet':
+              return balanceSheet;
+            case 'get_cash_flow':
+              return cashFlow;
+            case 'list_invoices':
+              return invoices;
+            case 'list_clients':
+              return clients;
+            case 'list_expenses':
+              return expenses;
+            case 'list_vendors':
+              return vendors;
+            case 'clear_all_data':
+              clearAllData();
+              return { success: true, message: 'All storage and data cleared.' };
+            case 'reset_demo_data':
+              resetToDemoData();
+              return { success: true, message: 'Demo data loaded.' };
+            default:
+              return { error: `Unknown action: ${action}` };
+          }
+        },
+      };
+
+      try {
+        if (typeof ctx.registerTool === 'function') {
+          ctx.registerTool(accountingTool);
+        } else if (typeof ctx.register === 'function') {
+          ctx.register(accountingTool);
+        } else if (typeof ctx.addTool === 'function') {
+          ctx.addTool(accountingTool);
+        } else if (Array.isArray(ctx.tools)) {
+          const existingIdx = ctx.tools.findIndex((t: any) => t.name === accountingTool.name);
+          if (existingIdx >= 0) {
+            ctx.tools[existingIdx] = accountingTool;
+          } else {
+            ctx.tools.push(accountingTool);
+          }
+        } else {
+          ctx.accountingTool = accountingTool;
+        }
+        return true;
+      } catch (err) {
+        console.warn('Could not register accounting tool in modelContext:', err);
+        return false;
+      }
+    };
+
+    // Attempt immediate registration
+    registerAccountingTool();
+
+    // Also listen for document/window events if modelContext is injected asynchronously
+    const handleContextReady = () => {
+      registerAccountingTool();
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('modelcontext:ready', handleContextReady);
+      document.addEventListener('modelContextReady', handleContextReady);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('modelcontext:ready', handleContextReady);
+      window.addEventListener('modelContextReady', handleContextReady);
+    }
+
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('modelcontext:ready', handleContextReady);
+        document.removeEventListener('modelContextReady', handleContextReady);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('modelcontext:ready', handleContextReady);
+        window.removeEventListener('modelContextReady', handleContextReady);
+      }
+    };
+  }, [
+    profitAndLoss,
+    balanceSheet,
+    cashFlow,
+    invoices,
+    clients,
+    expenses,
+    vendors,
+    selectedCurrency,
+  ]);
 
   // Invoices Actions
   const addInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'history'>): Invoice => {
@@ -1853,11 +2076,34 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
     setInventoryItems([]);
     setInventoryMovements([]);
     setPaymentVouchers([]);
-    showNotification('All demo, inventory, vendor, and transaction data cleared. Clean slate initialized.', 'info');
+    setCustomerInsights([]);
+    setOverallCustomerTrends(null);
+    setInventoryAutomationInsights([]);
+    setInventoryExecutiveSummary(null);
+    setSalesMonitorData(null);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const keysToRemove = [
+          `${STORAGE_KEY_PREFIX}clients`,
+          `${STORAGE_KEY_PREFIX}vendors`,
+          `${STORAGE_KEY_PREFIX}invoices`,
+          `${STORAGE_KEY_PREFIX}purchase_invoices`,
+          `${STORAGE_KEY_PREFIX}expenses`,
+          `${STORAGE_KEY_PREFIX}transactions`,
+          `${STORAGE_KEY_PREFIX}logs`,
+          `${STORAGE_KEY_PREFIX}inventory_items`,
+          `${STORAGE_KEY_PREFIX}inventory_movements`,
+          `${STORAGE_KEY_PREFIX}payment_vouchers`,
+        ];
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+      }
+    } catch {}
+    showNotification('All storage, demo, transaction, vendor, and inventory data cleared. Clean slate initialized.', 'info');
   };
 
   const resetToDemoData = () => {
-    setBusinessProfile(initialBusinessProfile);
+    setBusinessProfile(defaultDemoBusinessProfile);
+    setCurrentUser(defaultDemoAuthUser);
     setClients(initialClients);
     setVendors(initialVendors);
     setInvoices(initialInvoices);
@@ -1936,6 +2182,7 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
         login,
         loginWithPin,
         quickDemoLogin,
+        registerCompanyAndUser,
         lockSession,
         unlockSession,
         logout,

@@ -173,6 +173,23 @@ export const ClientsView: React.FC<{
             </div>
           );
         })}
+
+        {filteredClients.length === 0 && (
+          <div className="col-span-full py-12 text-center bg-white border border-slate-200/80 rounded-3xl p-8 shadow-xs">
+            <Users className="w-12 h-12 text-slate-300 mx-auto mb-3 stroke-[1.5]" />
+            <h3 className="text-sm font-bold text-slate-800">No Clients Found</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+              Add client accounts to dispatch invoices, track receivable balances, and manage payment terms.
+            </p>
+            <button
+              onClick={() => setIsClientModalOpen(true)}
+              className="mt-4 px-4 py-2 bg-slate-900 text-white font-semibold text-xs rounded-xl shadow-xs inline-flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add First Client</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

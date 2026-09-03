@@ -26,6 +26,7 @@ import { PaymentVouchersView } from './components/PaymentVouchersView';
 import { PaymentVoucherModal } from './components/PaymentVoucherModal';
 import { VoucherReceiptModal } from './components/VoucherReceiptModal';
 import { SecurityLoginView } from './components/SecurityLoginView';
+import { CreateCompanyOnboardingModal } from './components/CreateCompanyOnboardingModal';
 import { SettingsView } from './components/SettingsView';
 import { VendorsView } from './components/VendorsView';
 import { VendorModal } from './components/VendorModal';
@@ -38,6 +39,7 @@ import { Expense, Client, LedgerAccount, Vendor } from './types';
 
 const MainLayout: React.FC = () => {
   const {
+    businessProfile,
     activeTab,
     isExpenseModalOpen,
     setIsExpenseModalOpen,
@@ -64,6 +66,11 @@ const MainLayout: React.FC = () => {
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [vendorToEdit, setVendorToEdit] = useState<Vendor | null>(null);
   const [ledgerToEdit, setLedgerToEdit] = useState<LedgerAccount | null>(null);
+
+  // If no organization is registered yet, show onboarding
+  if (!businessProfile.companyName) {
+    return <CreateCompanyOnboardingModal />;
+  }
 
   // Security Login and Lock Screen Gate
   if (!isAuthenticated) {

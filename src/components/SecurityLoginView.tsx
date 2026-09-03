@@ -12,7 +12,9 @@ import {
   Sparkles,
   Eye,
   EyeOff,
+  Building2,
 } from 'lucide-react';
+import { CreateCompanyOnboardingModal } from './CreateCompanyOnboardingModal';
 
 interface SecurityLoginViewProps {
   isLocked?: boolean;
@@ -21,6 +23,7 @@ interface SecurityLoginViewProps {
 export const SecurityLoginView: React.FC<SecurityLoginViewProps> = ({ isLocked = false }) => {
   const { currentUser, login, loginWithPin, quickDemoLogin, unlockSession } = useAccounting();
 
+  const [showCreateCompany, setShowCreateCompany] = useState<boolean>(false);
   const [mode, setMode] = useState<'pin' | 'password'>('pin');
   const [pinDigits, setPinDigits] = useState<string>('');
   const [email, setEmail] = useState<string>(currentUser?.email || 'alex.vance@apexenterprise.com');
@@ -84,6 +87,10 @@ export const SecurityLoginView: React.FC<SecurityLoginViewProps> = ({ isLocked =
       setIsProcessing(false);
     }, 400);
   };
+
+  if (showCreateCompany) {
+    return <CreateCompanyOnboardingModal onCancel={() => setShowCreateCompany(false)} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4 selection:bg-emerald-500 selection:text-white">
@@ -291,16 +298,28 @@ export const SecurityLoginView: React.FC<SecurityLoginViewProps> = ({ isLocked =
         )}
 
         {/* Quick Demo Bypass Button */}
-        <div className="mt-6 pt-5 border-t border-slate-700/60 text-center">
+        <div className="mt-6 pt-5 border-t border-slate-700/60 text-center space-y-2">
           <button
             type="button"
             onClick={quickDemoLogin}
-            className="w-full py-2 px-3 bg-slate-900/80 hover:bg-slate-700/80 text-emerald-400 hover:text-emerald-300 text-xs font-semibold rounded-xl border border-emerald-500/20 transition-all flex items-center justify-center gap-2"
+            className="w-full py-2 px-3 bg-slate-900/80 hover:bg-slate-700/80 text-emerald-400 hover:text-emerald-300 text-xs font-semibold rounded-xl border border-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
             <span>1-Click Sign In as CFO (Alex Vance)</span>
           </button>
-          <p className="text-[10px] text-slate-500 mt-2">
+
+          {!isLocked && (
+            <button
+              type="button"
+              onClick={() => setShowCreateCompany(true)}
+              className="w-full py-2 px-3 bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold rounded-xl border border-slate-600/40 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Building2 className="w-3.5 h-3.5 text-slate-400" />
+              <span>Register New Company / Set Up Organization</span>
+            </button>
+          )}
+
+          <p className="text-[10px] text-slate-500 pt-1">
             Protected by 256-bit encryption & localized audit session verification.
           </p>
         </div>

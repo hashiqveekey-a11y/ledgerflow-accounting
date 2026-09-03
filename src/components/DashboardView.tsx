@@ -77,13 +77,22 @@ export const DashboardView: React.FC<{
   const runwayMonths = cashFlow.runwayMonths;
 
   // Monthly Revenue & Expense bar chart data
-  const monthlyFinancialData = [
-    { month: 'Apr', revenue: 38500, expenses: 14200, profit: 24300 },
-    { month: 'May', revenue: 44000, expenses: 16800, profit: 27200 },
-    { month: 'Jun', revenue: 52000, expenses: 19400, profit: 32600 },
-    { month: 'Jul', revenue: 47200, expenses: 17900, profit: 29300 },
-    { month: 'Aug', revenue: totalRevenue > 0 ? totalRevenue : 49500, expenses: totalExpenses > 0 ? totalExpenses : 18200, profit: netIncome > 0 ? netIncome : 31300 },
-  ];
+  const monthlyFinancialData =
+    totalRevenue > 0 || totalExpenses > 0
+      ? [
+          { month: 'Apr', revenue: Math.round(totalRevenue * 0.7), expenses: Math.round(totalExpenses * 0.75), profit: Math.round(netIncome * 0.65) },
+          { month: 'May', revenue: Math.round(totalRevenue * 0.8), expenses: Math.round(totalExpenses * 0.82), profit: Math.round(netIncome * 0.78) },
+          { month: 'Jun', revenue: Math.round(totalRevenue * 0.95), expenses: Math.round(totalExpenses * 0.9), profit: Math.round(netIncome * 0.98) },
+          { month: 'Jul', revenue: Math.round(totalRevenue * 0.9), expenses: Math.round(totalExpenses * 0.88), profit: Math.round(netIncome * 0.92) },
+          { month: 'Aug', revenue: totalRevenue, expenses: totalExpenses, profit: netIncome },
+        ]
+      : [
+          { month: 'Apr', revenue: 0, expenses: 0, profit: 0 },
+          { month: 'May', revenue: 0, expenses: 0, profit: 0 },
+          { month: 'Jun', revenue: 0, expenses: 0, profit: 0 },
+          { month: 'Jul', revenue: 0, expenses: 0, profit: 0 },
+          { month: 'Aug', revenue: 0, expenses: 0, profit: 0 },
+        ];
 
   // Expense Donut Data
   const categoryColors: Record<string, string> = {
@@ -456,53 +465,67 @@ export const DashboardView: React.FC<{
             <p className="text-xs text-slate-500 mb-3">Top operating expense allocations</p>
 
             <div className="h-44 w-full relative flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <RechartsPie>
-                  <Pie
-                    data={expenseBreakdownData}
-                    innerRadius={46}
-                    outerRadius={68}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {expenseBreakdownData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderColor: '#e2e8f0',
-                      borderRadius: '0.75rem',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                      color: '#0f172a',
-                      fontSize: '12px',
-                    }}
-                    formatter={(val: any) => [formatCurrency(Number(val), selectedCurrency), '']}
-                  />
-                </RechartsPie>
-              </ResponsiveContainer>
-              <div className="absolute text-center pointer-events-none">
-                <span className="text-[10px] text-slate-400 uppercase font-bold block">Total</span>
-                <span className="text-xs font-bold text-slate-900 font-mono">
-                  {formatCompactCurrency(totalExpenses, selectedCurrency)}
-                </span>
-              </div>
+              {expenseBreakdownData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center p-4 text-slate-400">
+                  <PieChart className="w-8 h-8 text-slate-300 mb-1.5 stroke-[1.5]" />
+                  <p className="text-xs font-semibold text-slate-600">No Expenses Recorded</p>
+                  <p className="text-[10px] text-slate-400">Distributions will appear when expenses are added.</p>
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsPie>
+                      <Pie
+                        data={expenseBreakdownData}
+                        innerRadius={46}
+                        outerRadius={68}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {expenseBreakdownData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#ffffff',
+                          borderColor: '#e2e8f0',
+                          borderRadius: '0.75rem',
+                          boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                          color: '#0f172a',
+                          fontSize: '12px',
+                        }}
+                        formatter={(val: any) => [formatCurrency(Number(val), selectedCurrency), '']}
+                      />
+                    </RechartsPie>
+                  </ResponsiveContainer>
+                  <div className="absolute text-center pointer-events-none">
+                    <span className="text-[10px] text-slate-400 uppercase font-bold block">Total</span>
+                    <span className="text-xs font-bold text-slate-900 font-mono">
+                      {formatCompactCurrency(totalExpenses, selectedCurrency)}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           <div className="space-y-1.5 mt-2 pt-3 border-t border-slate-100">
-            {expenseBreakdownData.slice(0, 4).map((item) => (
-              <div key={item.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-slate-600 truncate text-[11px] font-medium">{item.name}</span>
+            {expenseBreakdownData.length === 0 ? (
+              <p className="text-center text-[11px] text-slate-400 py-1">Zero operational expenses logged</p>
+            ) : (
+              expenseBreakdownData.slice(0, 4).map((item) => (
+                <div key={item.name} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="text-slate-600 truncate text-[11px] font-medium">{item.name}</span>
+                  </div>
+                  <span className="font-mono font-semibold text-slate-800 shrink-0 text-[11px]">
+                    {formatCurrency(item.value, selectedCurrency)}
+                  </span>
                 </div>
-                <span className="font-mono font-semibold text-slate-800 shrink-0 text-[11px]">
-                  {formatCurrency(item.value, selectedCurrency)}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -574,34 +597,41 @@ export const DashboardView: React.FC<{
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {invoices
-              .filter((i) => i.recurring?.isRecurring)
-              .slice(0, 4)
-              .map((inv) => (
-                <div
-                  key={inv.id}
-                  className="p-3.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 rounded-2xl transition-all"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-bold text-slate-900 truncate">
-                      {inv.clientCompany || inv.clientName}
-                    </span>
-                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      {inv.recurring?.frequency}
-                    </span>
+            {invoices.filter((i) => i.recurring?.isRecurring).length === 0 ? (
+              <div className="col-span-full py-6 text-center text-xs text-slate-400">
+                <p className="font-semibold text-slate-600">No Automated Retainers Scheduled</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Enable recurring schedules on any sales invoice for automated dispatch.</p>
+              </div>
+            ) : (
+              invoices
+                .filter((i) => i.recurring?.isRecurring)
+                .slice(0, 4)
+                .map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="p-3.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 rounded-2xl transition-all"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-slate-900 truncate">
+                        {inv.clientCompany || inv.clientName}
+                      </span>
+                      <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {inv.recurring?.frequency}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>Retainer Amount:</span>
+                      <span className="font-mono font-bold text-slate-900">
+                        {formatCurrency(inv.totalAmount, inv.currency)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                      <span>Next Auto-Dispatch:</span>
+                      <span className="font-mono text-emerald-700 font-semibold">{inv.recurring?.nextRunDate}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-slate-600">
-                    <span>Retainer Amount:</span>
-                    <span className="font-mono font-bold text-slate-900">
-                      {formatCurrency(inv.totalAmount, inv.currency)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
-                    <span>Next Auto-Dispatch:</span>
-                    <span className="font-mono text-emerald-700 font-semibold">{inv.recurring?.nextRunDate}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+            )}
           </div>
         </div>
       </div>
@@ -636,47 +666,56 @@ export const DashboardView: React.FC<{
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {recentInvoices.map((inv) => {
-                const statusStyles: Record<string, string> = {
-                  paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-                  sent: 'bg-blue-50 text-blue-700 border-blue-200',
-                  overdue: 'bg-rose-50 text-rose-700 border-rose-200',
-                  draft: 'bg-slate-100 text-slate-700 border-slate-200',
-                  cancelled: 'bg-slate-100 text-slate-500 border-slate-200 line-through',
-                };
+              {recentInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    <p className="font-semibold text-slate-700">No invoices yet</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Create your first invoice to begin tracking settlements in real time.</p>
+                  </td>
+                </tr>
+              ) : (
+                recentInvoices.map((inv) => {
+                  const statusStyles: Record<string, string> = {
+                    paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                    sent: 'bg-blue-50 text-blue-700 border-blue-200',
+                    overdue: 'bg-rose-50 text-rose-700 border-rose-200',
+                    draft: 'bg-slate-100 text-slate-700 border-slate-200',
+                    cancelled: 'bg-slate-100 text-slate-500 border-slate-200 line-through',
+                  };
 
-                return (
-                  <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 font-mono font-bold text-slate-900">{inv.invoiceNumber}</td>
-                    <td className="py-3 font-medium text-slate-800">
-                      <div>{inv.clientCompany || inv.clientName}</div>
-                      <div className="text-[11px] text-slate-500">{inv.clientEmail}</div>
-                    </td>
-                    <td className="py-3 text-slate-600 font-mono">{inv.issueDate}</td>
-                    <td className="py-3 text-slate-600 font-mono">{inv.dueDate}</td>
-                    <td className="py-3 text-right font-mono font-bold text-slate-900">
-                      {formatCurrency(inv.totalAmount, inv.currency)}
-                    </td>
-                    <td className="py-3 text-center">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-full border ${
-                          statusStyles[inv.status] || statusStyles.draft
-                        }`}
-                      >
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-right">
-                      <button
-                        onClick={() => setSelectedInvoiceForView(inv)}
-                        className="px-3 py-1 text-xs bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl transition-colors font-semibold"
-                      >
-                        View & Print
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                  return (
+                    <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-3 font-mono font-bold text-slate-900">{inv.invoiceNumber}</td>
+                      <td className="py-3 font-medium text-slate-800">
+                        <div>{inv.clientCompany || inv.clientName}</div>
+                        <div className="text-[11px] text-slate-500">{inv.clientEmail}</div>
+                      </td>
+                      <td className="py-3 text-slate-600 font-mono">{inv.issueDate}</td>
+                      <td className="py-3 text-slate-600 font-mono">{inv.dueDate}</td>
+                      <td className="py-3 text-right font-mono font-bold text-slate-900">
+                        {formatCurrency(inv.totalAmount, inv.currency)}
+                      </td>
+                      <td className="py-3 text-center">
+                        <span
+                          className={`inline-block px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-full border ${
+                            statusStyles[inv.status] || statusStyles.draft
+                          }`}
+                        >
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <button
+                          onClick={() => setSelectedInvoiceForView(inv)}
+                          className="px-3 py-1 text-xs bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl transition-colors font-semibold"
+                        >
+                          View & Print
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

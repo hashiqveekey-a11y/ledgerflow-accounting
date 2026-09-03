@@ -22,6 +22,7 @@ import {
   UserCheck,
   Mic,
   Volume2,
+  Cpu,
 } from 'lucide-react';
 import { CurrencyCode } from '../types';
 import { CURRENCY_SYMBOLS } from '../utils/accountingMath';
@@ -50,6 +51,7 @@ export const Navbar: React.FC<{
     lockSession,
     logout,
     setActiveTab,
+    openWebMCPModal,
   } = useAccounting();
 
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
@@ -155,6 +157,18 @@ export const Navbar: React.FC<{
             <Sparkles className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
             <span className="hidden md:inline">AI Financial Copilot</span>
             <span className="md:hidden">AI CPA</span>
+          </button>
+
+          {/* WebMCP Agent Hub & Protocol Inspector */}
+          <button
+            id="navbar-webmcp-btn"
+            onClick={openWebMCPModal}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-700/80 text-xs font-semibold rounded-xl transition-all shadow-xs group"
+            title="WebMCP (W3C Model Context Protocol) Tools & Agent Inspector"
+          >
+            <Cpu className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-12 transition-transform" />
+            <span className="font-mono text-xs font-semibold">WebMCP</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           </button>
 
           {/* PWA Install Button */}

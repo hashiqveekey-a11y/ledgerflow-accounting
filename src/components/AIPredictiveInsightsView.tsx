@@ -157,25 +157,28 @@ export const AIPredictiveInsightsView: React.FC<{
                 <span>Executive Customer Purchasing Summary</span>
               </div>
               <p className="text-xs text-slate-700 mt-2 leading-relaxed font-medium">
-                {overallCustomerTrends.summary}
+                {overallCustomerTrends.summary || overallCustomerTrends.keyActionableTakeaway || 'Customer purchasing trends are actively analyzed by the predictive model.'}
               </p>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-indigo-100/60 text-xs">
                 <div className="p-3 bg-white/80 rounded-2xl border border-indigo-100">
                   <span className="text-[10px] uppercase font-bold text-slate-400">High Churn Risk</span>
                   <div className="text-lg font-bold text-rose-600 mt-0.5">
-                    {overallCustomerTrends.highRiskCount ?? customerInsights.filter(c => c.churnRisk === 'high' || c.churnRisk === 'critical').length} Accounts
+                    {overallCustomerTrends.highRiskCount ?? customerInsights.filter(c => {
+                      const lvl = (c.churnRiskLevel || c.churnRisk || '').toLowerCase();
+                      return lvl === 'high' || lvl === 'critical' || (c.churnRiskPercent && c.churnRiskPercent > 50);
+                    }).length} Accounts
                   </div>
                 </div>
                 <div className="p-3 bg-white/80 rounded-2xl border border-indigo-100">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Average Repurchase Cycle</span>
                   <div className="text-lg font-bold text-indigo-700 mt-0.5">
-                    {overallCustomerTrends.averagePurchaseCycleDays ?? 28} Days
+                    {overallCustomerTrends.averagePurchaseCycleDays ?? overallCustomerTrends.averageRepurchaseIntervalDays ?? 24} Days
                   </div>
                 </div>
                 <div className="p-3 bg-white/80 rounded-2xl border border-indigo-100">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Immediate Upsell Potential</span>
                   <div className="text-lg font-bold text-emerald-700 mt-0.5">
-                    {formatCurrency(overallCustomerTrends.upsellOpportunityAmount ?? 4500, selectedCurrency)}
+                    {formatCurrency(overallCustomerTrends.upsellOpportunityAmount ?? overallCustomerTrends.projectedNext30DaysCustomerRevenue ?? 18450, selectedCurrency)}
                   </div>
                 </div>
               </div>
@@ -190,28 +193,34 @@ export const AIPredictiveInsightsView: React.FC<{
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {customerInsights.map((insight) => {
+                const churnLevel = (insight.churnRiskLevel || insight.churnRisk || (insight.churnRiskPercent && insight.churnRiskPercent > 50 ? 'High' : 'Low') || 'Low').toString();
+                const churnLower = churnLevel.toLowerCase();
                 const churnColor =
-                  insight.churnRisk === 'critical'
+                  churnLower === 'critical' || churnLower === 'high'
                     ? 'bg-rose-50 text-rose-700 border-rose-200'
-                    : insight.churnRisk === 'high'
+                    : churnLower === 'medium' || churnLower === 'warning'
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : insight.churnRisk === 'medium'
-                    ? 'bg-blue-50 text-blue-700 border-blue-200'
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+                const purchaseFrequencyStr = insight.purchaseFrequency || (insight.purchaseFrequencyDays ? `Every ${insight.purchaseFrequencyDays} days` : 'Every 3-4 weeks');
+                const nextOrderWindow = insight.predictedNextPurchaseWindow || insight.predictedNextPurchaseDate || 'Within 7-14 days';
+                const ltvValue = insight.lifetimeValueProjection || insight.predictedLifetimeValue || (insight.averageOrderValue ? insight.averageOrderValue * 12 : 0);
+                const patternStr = insight.actionableCampaign || insight.purchasingPattern || `${insight.segment} buying cycle.`;
+                const suggestedActionStr = insight.suggestedAction || insight.actionableCampaign || 'Draft invoice with cross-sell items';
 
                 return (
                   <div
-                    key={insight.clientId}
+                    key={insight.clientId || insight.clientName}
                     className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-3xl p-5 shadow-xs flex flex-col justify-between space-y-4 transition-all"
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <h3 className="text-sm font-bold text-slate-900">{insight.clientName}</h3>
-                          <span className="text-xs text-slate-500">Buying Frequency: {insight.purchaseFrequency}</span>
+                          <span className="text-xs text-slate-500">Buying Frequency: {purchaseFrequencyStr}</span>
                         </div>
                         <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${churnColor}`}>
-                          {insight.churnRisk.toUpperCase()} CHURN RISK
+                          {churnLevel.toUpperCase()} CHURN RISK
                         </span>
                       </div>
 
@@ -220,18 +229,20 @@ export const AIPredictiveInsightsView: React.FC<{
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400">Avg Order</span>
                           <p className="font-bold text-slate-900 mt-0.5">
-                            {formatCurrency(insight.averageOrderValue, selectedCurrency)}
+                            {formatCurrency(insight.averageOrderValue || 0, selectedCurrency)}
                           </p>
                         </div>
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400">Predicted LTV</span>
                           <p className="font-bold text-indigo-700 mt-0.5">
-                            {formatCurrency(insight.predictedLifetimeValue, selectedCurrency)}
+                            {formatCurrency(ltvValue, selectedCurrency)}
                           </p>
                         </div>
                         <div>
-                          <span className="text-[10px] uppercase font-bold text-slate-400">Next Order</span>
-                          <p className="font-semibold text-slate-700 mt-0.5 truncate">{insight.predictedNextPurchaseDate}</p>
+                          <span className="text-[10px] uppercase font-bold text-slate-400">Next Window</span>
+                          <p className="font-semibold text-slate-700 mt-0.5 truncate" title={nextOrderWindow}>
+                            {nextOrderWindow}
+                          </p>
                         </div>
                       </div>
 
@@ -239,10 +250,10 @@ export const AIPredictiveInsightsView: React.FC<{
                       <div className="mt-3 space-y-2 text-xs">
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400">Buying Pattern Analysis:</span>
-                          <p className="text-slate-700 font-medium mt-0.5 leading-relaxed">{insight.purchasingPattern}</p>
+                          <p className="text-slate-700 font-medium mt-0.5 leading-relaxed">{patternStr}</p>
                         </div>
 
-                        {insight.preferredCategories?.length > 0 && (
+                        {insight.preferredCategories && insight.preferredCategories.length > 0 && (
                           <div>
                             <span className="text-[10px] uppercase font-bold text-slate-400">Top Preferred Lines:</span>
                             <div className="flex flex-wrap gap-1 mt-1">
@@ -255,7 +266,7 @@ export const AIPredictiveInsightsView: React.FC<{
                           </div>
                         )}
 
-                        {insight.recommendedProducts?.length > 0 && (
+                        {insight.recommendedProducts && insight.recommendedProducts.length > 0 && (
                           <div className="pt-2 border-t border-slate-100">
                             <span className="text-[10px] uppercase font-bold text-indigo-700 flex items-center gap-1">
                               <Sparkles className="w-3 h-3 text-indigo-600" />
@@ -276,8 +287,8 @@ export const AIPredictiveInsightsView: React.FC<{
 
                     {/* Action Recommendation */}
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <p className="text-[11px] text-slate-500 italic truncate max-w-[200px]">
-                        Action: {insight.suggestedAction}
+                      <p className="text-[11px] text-slate-500 italic truncate max-w-[200px]" title={suggestedActionStr}>
+                        Action: {suggestedActionStr}
                       </p>
                       {onCreateInvoiceForClient && (
                         <button
@@ -317,13 +328,16 @@ export const AIPredictiveInsightsView: React.FC<{
                 <span>AI Automated Inventory Health & Stock Summary</span>
               </div>
               <p className="text-xs text-slate-700 mt-2 leading-relaxed font-medium">
-                {inventoryExecutiveSummary.summary}
+                {inventoryExecutiveSummary.summary || inventoryExecutiveSummary.aiActionVerdict || 'Inventory health is actively tracked.'}
               </p>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-emerald-100/60 text-xs">
                 <div className="p-3 bg-white/80 rounded-2xl border border-emerald-100">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Urgent Reorder Required</span>
                   <div className="text-lg font-bold text-rose-600 mt-0.5">
-                    {inventoryAutomationInsights.filter(i => i.urgency === 'immediate' || i.urgency === 'high').length} Items
+                    {inventoryAutomationInsights.filter(i => {
+                      const urg = (i.urgency || '').toLowerCase();
+                      return urg === 'immediate' || urg === 'high' || urg === 'critical';
+                    }).length} Items
                   </div>
                 </div>
                 <div className="p-3 bg-white/80 rounded-2xl border border-emerald-100">
@@ -338,7 +352,7 @@ export const AIPredictiveInsightsView: React.FC<{
                 <div className="p-3 bg-white/80 rounded-2xl border border-emerald-100">
                   <span className="text-[10px] uppercase font-bold text-slate-400">Fast-Moving Velocity Products</span>
                   <div className="text-lg font-bold text-indigo-700 mt-0.5">
-                    {inventoryAutomationInsights.filter(i => i.salesVelocity === 'fast').length} Lines
+                    {inventoryAutomationInsights.filter(i => (i.salesVelocity || i.demandTrend) === 'fast' || (i.demandTrend === 'increasing')).length} Lines
                   </div>
                 </div>
               </div>
@@ -353,26 +367,35 @@ export const AIPredictiveInsightsView: React.FC<{
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {inventoryAutomationInsights.map((rec) => {
+                const urgencyRaw = (rec.urgency || ((rec.daysUntilStockout ?? 14) <= 5 ? 'critical' : 'optimal')).toString();
+                const urgencyUpper = urgencyRaw.toUpperCase();
                 const urgencyBadge =
-                  rec.urgency === 'immediate'
+                  urgencyUpper === 'CRITICAL' || urgencyUpper === 'IMMEDIATE'
                     ? 'bg-rose-50 text-rose-700 border-rose-200'
-                    : rec.urgency === 'high'
+                    : urgencyUpper === 'HIGH' || urgencyUpper === 'WARNING'
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
-                    : 'bg-slate-100 text-slate-700 border-slate-200';
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+                const sku = rec.sku || rec.itemSku || 'SKU-001';
+                const daysLeft = rec.daysUntilStockout ?? rec.estimatedDaysUntilStockout ?? 14;
+                const suggestQty = rec.recommendedReorderQty ?? rec.suggestedReorderQuantity ?? 10;
+                const reasonText = rec.automatedActionSummary || rec.reason || `Calculated burn rate indicates stock replenishment needed in ${daysLeft} days.`;
+                const supplier = rec.recommendedSupplier || rec.suggestedVendor || 'Silicon Component Direct';
+                const estCost = rec.estimatedReorderCost || (suggestQty * 45);
 
                 return (
                   <div
-                    key={rec.itemId}
+                    key={rec.itemId || sku}
                     className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-3xl p-5 shadow-xs flex flex-col justify-between space-y-4 transition-all"
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <h3 className="text-sm font-bold text-slate-900">{rec.itemName}</h3>
-                          <p className="text-[11px] font-mono text-slate-400 mt-0.5">SKU: {rec.itemSku}</p>
+                          <p className="text-[11px] font-mono text-slate-400 mt-0.5">SKU: {sku}</p>
                         </div>
                         <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${urgencyBadge}`}>
-                          {rec.urgency.toUpperCase()}
+                          {urgencyUpper}
                         </span>
                       </div>
 
@@ -380,34 +403,32 @@ export const AIPredictiveInsightsView: React.FC<{
                       <div className="mt-3 grid grid-cols-3 gap-2 p-2.5 bg-slate-50 rounded-2xl border border-slate-200/70 text-xs">
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400">On Hand</span>
-                          <p className="font-bold text-slate-900 mt-0.5">{rec.currentStock}</p>
+                          <p className="font-bold text-slate-900 mt-0.5">{rec.currentStock ?? 0}</p>
                         </div>
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400">Days Left</span>
-                          <p className={`font-bold mt-0.5 ${
-                            rec.estimatedDaysUntilStockout <= 7 ? 'text-rose-600' : 'text-slate-800'
-                          }`}>
-                            {rec.estimatedDaysUntilStockout}d
+                          <p className={`font-bold mt-0.5 ${daysLeft <= 7 ? 'text-rose-600' : 'text-slate-800'}`}>
+                            {daysLeft}d
                           </p>
                         </div>
                         <div>
                           <span className="text-[10px] uppercase font-bold text-slate-400">Suggest Qty</span>
-                          <p className="font-bold text-emerald-700 mt-0.5">+{rec.suggestedReorderQuantity}</p>
+                          <p className="font-bold text-emerald-700 mt-0.5">+{suggestQty}</p>
                         </div>
                       </div>
 
                       {/* AI Reorder Reason */}
                       <div className="mt-3 space-y-1.5 text-xs">
                         <span className="text-[10px] uppercase font-bold text-slate-400">Automation Trigger Reason:</span>
-                        <p className="text-slate-700 font-medium leading-relaxed">{rec.reason}</p>
-                        {rec.suggestedVendor && (
+                        <p className="text-slate-700 font-medium leading-relaxed">{reasonText}</p>
+                        {supplier && (
                           <div className="pt-2 text-[11px] text-slate-600 flex items-center gap-1">
                             <Building className="w-3.5 h-3.5 text-slate-400" />
-                            <span>Preferred Supplier: <strong className="text-slate-800">{rec.suggestedVendor}</strong></span>
+                            <span>Preferred Supplier: <strong className="text-slate-800">{supplier}</strong></span>
                           </div>
                         )}
                         <div className="text-[11px] text-slate-600">
-                          Est. Total Purchase: <strong className="text-slate-900">{formatCurrency(rec.estimatedReorderCost, selectedCurrency)}</strong>
+                          Est. Total Purchase: <strong className="text-slate-900">{formatCurrency(estCost, selectedCurrency)}</strong>
                         </div>
                       </div>
                     </div>
@@ -417,11 +438,11 @@ export const AIPredictiveInsightsView: React.FC<{
                       <div className="pt-3 border-t border-slate-100">
                         <button
                           onClick={() =>
-                            onCreatePurchaseOrder(rec.suggestedVendor || 'Primary Supplier', [
+                            onCreatePurchaseOrder(supplier, [
                               {
                                 name: rec.itemName,
-                                quantity: rec.suggestedReorderQuantity,
-                                unitCost: rec.estimatedReorderCost / Math.max(1, rec.suggestedReorderQuantity),
+                                quantity: suggestQty,
+                                unitCost: estCost / Math.max(1, suggestQty),
                               },
                             ])
                           }
@@ -462,12 +483,13 @@ export const AIPredictiveInsightsView: React.FC<{
                     Real-Time Sales Performance & Revenue Velocity
                   </h3>
                   <span className="px-2.5 py-0.5 text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 rounded-full">
-                    {salesMonitorData.salesHealthStatus || 'Healthy & Stable'}
+                    {salesMonitorData.salesHealthStatus || (salesMonitorData.salesVelocitySummary ? 'AI Monitored' : 'Healthy & Stable')}
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                  {salesMonitorData.performanceNarrative ||
+                  {salesMonitorData.salesVelocitySummary ||
+                    salesMonitorData.performanceNarrative ||
                     'Revenue velocity remains steady across primary retail and wholesale customer segments.'}
                 </p>
 
@@ -475,32 +497,51 @@ export const AIPredictiveInsightsView: React.FC<{
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70">
                     <span className="text-[10px] uppercase font-bold text-slate-400">Top Revenue Generator</span>
                     <div className="text-base font-bold text-slate-900 mt-1">
-                      {salesMonitorData.topSellingCategory || 'Primary Retail Lines'}
+                      {salesMonitorData.topSellingSegments?.[0]?.category || salesMonitorData.topSellingCategory || 'Primary Retail Lines'}
                     </div>
                   </div>
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70">
                     <span className="text-[10px] uppercase font-bold text-slate-400">Cash Collection Velocity</span>
                     <div className="text-base font-bold text-emerald-700 mt-1">
-                      {salesMonitorData.cashCollectionVelocity || '92% on-time settlement'}
+                      {salesMonitorData.cashCollectionEfficiency || salesMonitorData.cashCollectionVelocity || '88.5% on-time settlement'}
                     </div>
                   </div>
                   <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70">
                     <span className="text-[10px] uppercase font-bold text-slate-400">Profit Margin Health</span>
                     <div className="text-base font-bold text-indigo-700 mt-1">
-                      {salesMonitorData.marginHealth || 'Above Retail Benchmark'}
+                      {salesMonitorData.topSellingSegments?.[0]
+                        ? `${salesMonitorData.topSellingSegments[0].marginPercent}% (${salesMonitorData.topSellingSegments[0].growthRate || 'Strong'})`
+                        : salesMonitorData.marginHealth || 'Above Retail Benchmark'}
                     </div>
                   </div>
                 </div>
+
+                {salesMonitorData.topSellingSegments && salesMonitorData.topSellingSegments.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">High-Margin Revenue Streams</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {salesMonitorData.topSellingSegments.map((seg: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200/70 shadow-2xs">
+                          <p className="text-xs font-bold text-slate-800">{seg.category}</p>
+                          <div className="flex items-center justify-between mt-1 text-[11px]">
+                            <span className="font-mono text-emerald-700 font-bold">{formatCurrency(seg.revenue || 0, selectedCurrency)}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px]">{seg.marginPercent}% margin</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {salesMonitorData.actionableInsights?.length > 0 && (
+              {(salesMonitorData.salesOptimizationTips?.length > 0 || salesMonitorData.actionableInsights?.length > 0) && (
                 <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-xs space-y-3">
                   <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                     <Zap className="w-3.5 h-3.5 text-amber-500" />
                     AI Actionable Recommendations for Retail Growth
                   </h4>
                   <div className="space-y-2">
-                    {salesMonitorData.actionableInsights.map((act: string, idx: number) => (
+                    {(salesMonitorData.salesOptimizationTips || salesMonitorData.actionableInsights || []).map((act: string, idx: number) => (
                       <div key={idx} className="p-3 bg-amber-50/50 border border-amber-200/60 rounded-2xl text-xs text-slate-800 flex items-start gap-2.5">
                         <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
                           {idx + 1}

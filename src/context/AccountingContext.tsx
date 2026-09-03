@@ -36,6 +36,7 @@ import {
   InventoryAutomationInsight,
   CameraScanMode,
 } from '../types';
+import { registerAccountingWebMCP } from '../webmcp/registerAccountingTools';
 import {
   initialBusinessProfile,
   blankBusinessProfile,
@@ -54,6 +55,9 @@ import {
   initialInventoryItems,
   initialInventoryMovements,
   initialPaymentVouchers,
+  initialCustomerInsights,
+  initialInventoryAutomationInsights,
+  initialSalesMonitorData,
 } from '../data/initialData';
 import {
   calculateProfitAndLoss,
@@ -171,6 +175,10 @@ interface AccountingContextType {
   setCameraScannerMode: (mode: CameraScanMode) => void;
   openCameraScanner: (mode: CameraScanMode) => void;
   closeCameraScanner: () => void;
+  isWebMCPModalOpen: boolean;
+  setIsWebMCPModalOpen: (open: boolean) => void;
+  openWebMCPModal: () => void;
+  closeWebMCPModal: () => void;
   draftInvoicePrefill: Partial<Invoice> | null;
   setDraftInvoicePrefill: (draft: Partial<Invoice> | null) => void;
   draftPurchaseInvoicePrefill: Partial<PurchaseInvoice> | null;
@@ -499,15 +507,31 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [selectedItemForAdjustment, setSelectedItemForAdjustment] = useState<InventoryItem | null>(null);
 
   // AI Predictive Insights & Automation State
-  const [customerInsights, setCustomerInsights] = useState<CustomerPredictiveInsight[]>([]);
-  const [overallCustomerTrends, setOverallCustomerTrends] = useState<any>(null);
+  const [customerInsights, setCustomerInsights] = useState<CustomerPredictiveInsight[]>(() => initialCustomerInsights);
+  const [overallCustomerTrends, setOverallCustomerTrends] = useState<any>(() => ({
+    topCrossSellCombination: 'Hardware Units + Network Peripherals (64% co-purchase rate)',
+    peakShoppingCycle: 'Mid-month (12th-18th) and Quarter-end renewals',
+    averagePurchaseCycleDays: 24,
+    projectedNext30DaysCustomerRevenue: 18450,
+    summary: 'High-value enterprise accounts are approaching their repurchase cycle. Automated invoice proposals prepared with predictive 14-day ordering windows.',
+    keyActionableTakeaway: 'High-value enterprise accounts are approaching their repurchase cycle. Automated invoice proposals prepared.',
+    highRiskCount: 1,
+  }));
   const [isPredictiveInsightsLoading, setIsPredictiveInsightsLoading] = useState<boolean>(false);
 
-  const [inventoryAutomationInsights, setInventoryAutomationInsights] = useState<InventoryAutomationInsight[]>([]);
-  const [inventoryExecutiveSummary, setInventoryExecutiveSummary] = useState<any>(null);
+  const [inventoryAutomationInsights, setInventoryAutomationInsights] = useState<InventoryAutomationInsight[]>(() => initialInventoryAutomationInsights);
+  const [inventoryExecutiveSummary, setInventoryExecutiveSummary] = useState<any>(() => ({
+    totalItemsTracked: initialInventoryItems.length,
+    criticalStockouts: 0,
+    lowStockAlerts: 1,
+    estimatedTotalRestockBudget: 2340,
+    stockTurnoverVelocity: '4.8x / year',
+    aiActionVerdict: '1 item below reorder safety threshold. Restock order generated.',
+    summary: '1 critical stock line identified for immediate PO generation. Balance of catalog remains within target safety days.',
+  }));
   const [isInventoryAutomationLoading, setIsInventoryAutomationLoading] = useState<boolean>(false);
 
-  const [salesMonitorData, setSalesMonitorData] = useState<any>(null);
+  const [salesMonitorData, setSalesMonitorData] = useState<any>(() => initialSalesMonitorData);
   const [isSalesMonitorLoading, setIsSalesMonitorLoading] = useState<boolean>(false);
 
   // Payment Vouchers UI State
@@ -529,6 +553,9 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState<boolean>(false);
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState<boolean>(false);
   const [cameraScannerMode, setCameraScannerMode] = useState<CameraScanMode>('purchase');
+  const [isWebMCPModalOpen, setIsWebMCPModalOpen] = useState<boolean>(false);
+  const openWebMCPModal = () => setIsWebMCPModalOpen(true);
+  const closeWebMCPModal = () => setIsWebMCPModalOpen(false);
   const [draftInvoicePrefill, setDraftInvoicePrefill] = useState<Partial<Invoice> | null>(null);
   const [draftPurchaseInvoicePrefill, setDraftPurchaseInvoicePrefill] = useState<Partial<PurchaseInvoice> | null>(null);
   const [notificationMessage, setNotificationMessage] = useState<{
@@ -596,6 +623,38 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY_PREFIX}payment_vouchers`, JSON.stringify(paymentVouchers));
   }, [paymentVouchers]);
+
+  // Register / update WebMCP tools with current context state & action bindings
+  useEffect(() => {
+    registerAccountingWebMCP({
+      businessProfile,
+      invoices,
+      purchaseInvoices,
+      expenses,
+      clients,
+      vendors,
+      ledgerAccounts,
+      bankTransactions,
+      customerInsights,
+      addInvoice,
+      addPurchaseInvoice,
+      openCameraScanner,
+      runAutomatedRecurringEngine,
+      showNotification,
+      selectedCurrency,
+    });
+  }, [
+    businessProfile,
+    invoices,
+    purchaseInvoices,
+    expenses,
+    clients,
+    vendors,
+    ledgerAccounts,
+    bankTransactions,
+    customerInsights,
+    selectedCurrency,
+  ]);
 
   // Recalculate client balances when invoices change
   useEffect(() => {
@@ -2023,6 +2082,7 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
     setIsAICopilotOpen(false);
     setIsReceiptScannerOpen(false);
     setIsCameraScannerOpen(false);
+    setIsWebMCPModalOpen(false);
     setSelectedInvoiceForView(null);
     setSelectedPurchaseInvoiceForView(null);
     setSelectedVoucherForView(null);
@@ -2422,8 +2482,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const contentType = response.headers.get('content-type') || '';
       if (response.ok && contentType.includes('application/json')) {
         const res = await response.json();
-        if (res.data?.customerInsights) {
+        if (res.data?.customerInsights && res.data.customerInsights.length > 0) {
           setCustomerInsights(res.data.customerInsights);
+        }
+        if (res.data?.overallTrends) {
           setOverallCustomerTrends(res.data.overallTrends);
         }
       }
@@ -2445,8 +2507,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       const contentType = response.headers.get('content-type') || '';
       if (response.ok && contentType.includes('application/json')) {
         const res = await response.json();
-        if (res.data?.reorderRecommendations) {
+        if (res.data?.reorderRecommendations && res.data.reorderRecommendations.length > 0) {
           setInventoryAutomationInsights(res.data.reorderRecommendations);
+        }
+        if (res.data?.executiveStockSummary) {
           setInventoryExecutiveSummary(res.data.executiveStockSummary);
         }
       }
@@ -2530,6 +2594,27 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
     setInventoryItems(initialInventoryItems);
     setInventoryMovements(initialInventoryMovements);
     setPaymentVouchers(initialPaymentVouchers);
+    setCustomerInsights(initialCustomerInsights);
+    setOverallCustomerTrends({
+      topCrossSellCombination: 'Hardware Units + Network Peripherals (64% co-purchase rate)',
+      peakShoppingCycle: 'Mid-month (12th-18th) and Quarter-end renewals',
+      averagePurchaseCycleDays: 24,
+      projectedNext30DaysCustomerRevenue: 18450,
+      summary: 'High-value enterprise accounts are approaching their repurchase cycle. Automated invoice proposals prepared with predictive 14-day ordering windows.',
+      keyActionableTakeaway: 'High-value enterprise accounts are approaching their repurchase cycle. Automated invoice proposals prepared.',
+      highRiskCount: 1,
+    });
+    setInventoryAutomationInsights(initialInventoryAutomationInsights);
+    setInventoryExecutiveSummary({
+      totalItemsTracked: initialInventoryItems.length,
+      criticalStockouts: 0,
+      lowStockAlerts: 1,
+      estimatedTotalRestockBudget: 2340,
+      stockTurnoverVelocity: '4.8x / year',
+      aiActionVerdict: '1 item below reorder safety threshold. Restock order generated.',
+      summary: '1 critical stock line identified for immediate PO generation. Balance of catalog remains within target safety days.',
+    });
+    setSalesMonitorData(initialSalesMonitorData);
     showNotification('Sample retail & enterprise demo data loaded with active vendors, inventory items, and ledgers.', 'success');
   };
 
@@ -2679,6 +2764,10 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
         setCameraScannerMode,
         openCameraScanner,
         closeCameraScanner,
+        isWebMCPModalOpen,
+        setIsWebMCPModalOpen,
+        openWebMCPModal,
+        closeWebMCPModal,
         draftInvoicePrefill,
         setDraftInvoicePrefill,
         draftPurchaseInvoicePrefill,

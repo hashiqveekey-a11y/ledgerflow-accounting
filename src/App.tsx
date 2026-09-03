@@ -13,6 +13,7 @@ import { ExpensesView } from './components/ExpensesView';
 import { ExpenseModal } from './components/ExpenseModal';
 import { ReceiptScannerModal } from './components/ReceiptScannerModal';
 import { CameraDocumentScannerModal } from './components/CameraDocumentScannerModal';
+import { WebMCPModal } from './components/WebMCPModal';
 import { FinancialReportsView } from './components/FinancialReportsView';
 import { BankReconciliationView } from './components/BankReconciliationView';
 import { ClientsView } from './components/ClientsView';
@@ -58,6 +59,8 @@ const MainLayout: React.FC = () => {
     setIsAICopilotOpen,
     isReceiptScannerOpen,
     setIsReceiptScannerOpen,
+    isWebMCPModalOpen,
+    closeWebMCPModal,
     isAuthenticated,
     isSessionLocked,
   } = useAccounting();
@@ -234,6 +237,10 @@ const MainLayout: React.FC = () => {
         onClose={() => setIsReceiptScannerOpen(false)}
       />
       <CameraDocumentScannerModal />
+      <WebMCPModal
+        isOpen={isWebMCPModalOpen}
+        onClose={closeWebMCPModal}
+      />
       <ClientModal
         clientToEdit={clientToEdit}
         onClose={handleCloseClientModal}

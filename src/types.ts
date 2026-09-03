@@ -104,18 +104,25 @@ export interface Vendor {
 export interface CustomerPredictiveInsight {
   clientId: string;
   clientName: string;
-  segment: 'Champion' | 'Loyal Retail Shopper' | 'Potential Loyalist' | 'At Risk' | 'Dormant' | 'New Buyer';
+  segment: 'Champion' | 'Loyal Retail Shopper' | 'Potential Loyalist' | 'At Risk' | 'Dormant' | 'New Buyer' | string;
   averageOrderValue: number;
   purchaseFrequencyDays: number;
+  purchaseFrequency?: string;
   totalOrdersCount: number;
   totalSpent: number;
   lastPurchaseDate: string;
   predictedNextPurchaseWindow: string;
+  predictedNextPurchaseDate?: string;
   churnRiskPercent: number;
-  churnRiskLevel: 'Low' | 'Medium' | 'High';
+  churnRiskLevel: 'Low' | 'Medium' | 'High' | string;
+  churnRisk?: string;
   recommendedProducts: string[];
   actionableCampaign: string;
+  purchasingPattern?: string;
+  suggestedAction?: string;
   lifetimeValueProjection: number;
+  predictedLifetimeValue?: number;
+  preferredCategories?: string[];
 }
 
 export interface InventoryAutomationInsight {
@@ -127,9 +134,16 @@ export interface InventoryAutomationInsight {
   recommendedReorderQty: number;
   recommendedSupplier?: string;
   estimatedReorderCost: number;
-  demandTrend: 'increasing' | 'stable' | 'decreasing';
-  urgency: 'critical' | 'warning' | 'optimal';
+  demandTrend: 'increasing' | 'stable' | 'decreasing' | string;
+  urgency: 'critical' | 'warning' | 'optimal' | 'immediate' | 'high' | string;
   automatedActionSummary: string;
+  itemId?: string;
+  itemSku?: string;
+  estimatedDaysUntilStockout?: number;
+  suggestedReorderQuantity?: number;
+  reason?: string;
+  suggestedVendor?: string;
+  salesVelocity?: 'fast' | 'moderate' | 'slow' | string;
 }
 
 export interface AssetsLiabilitiesReport {

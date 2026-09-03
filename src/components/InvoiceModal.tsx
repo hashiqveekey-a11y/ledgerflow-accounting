@@ -14,6 +14,7 @@ import {
   Mail,
   Clock,
   Check,
+  Camera,
 } from 'lucide-react';
 import { formatCurrency, CURRENCY_SYMBOLS } from '../utils/accountingMath';
 
@@ -23,12 +24,15 @@ export const InvoiceModal: React.FC = () => {
     setIsInvoiceModalOpen,
     selectedInvoiceForEdit,
     setSelectedInvoiceForEdit,
+    draftInvoicePrefill,
+    setDraftInvoicePrefill,
     clients,
     businessProfile,
     addInvoice,
     updateInvoice,
     generateInvoiceWithAI,
     selectedCurrency,
+    openCameraScanner,
   } = useAccounting();
 
   const [aiPrompt, setAiPrompt] = useState('');
@@ -92,20 +96,35 @@ export const InvoiceModal: React.FC = () => {
     } else {
       // New Invoice mode
       const nextNum = businessProfile.invoiceNextNumber;
-      setInvoiceNumber(`${businessProfile.invoicePrefix}${nextNum}`);
+      setInvoiceNumber(draftInvoicePrefill?.invoiceNumber || `${businessProfile.invoicePrefix}${nextNum}`);
 
       const todayStr = new Date().toISOString().split('T')[0];
       const dueStr = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-      setIssueDate(todayStr);
-      setDueDate(dueStr);
+      setIssueDate(draftInvoicePrefill?.issueDate || todayStr);
+      setDueDate(draftInvoicePrefill?.dueDate || dueStr);
       setCurrency(selectedCurrency || businessProfile.defaultCurrency);
       setStatus('sent');
-      setNotes('Thank you for your business! Please remit payment according to terms.');
-      setTerms(businessProfile.paymentInstructions);
+      setNotes(draftInvoicePrefill?.notes || 'Thank you for your business! Please remit payment according to terms.');
+      setTerms(draftInvoicePrefill?.termsAndConditions || businessProfile.paymentInstructions);
 
-      // Default client
-      if (clients.length > 0) {
+      // Client selection or prefill
+      if (draftInvoicePrefill?.clientName) {
+        const found = clients.find(
+          (c) =>
+            c.name.toLowerCase() === draftInvoicePrefill.clientName?.toLowerCase() ||
+            c.companyName.toLowerCase() === draftInvoicePrefill.clientName?.toLowerCase()
+        );
+        if (found) {
+          handleClientSelect(found.id);
+        } else {
+          setClientId('client-scanned-draft');
+          setClientName(draftInvoicePrefill.clientName);
+          setClientCompany(draftInvoicePrefill.clientCompany || `${draftInvoicePrefill.clientName}`);
+          setClientEmail(draftInvoicePrefill.clientEmail || `billing@${draftInvoicePrefill.clientName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com`);
+          setClientAddress(draftInvoicePrefill.clientAddress || '100 Business Parkway');
+        }
+      } else if (clients.length > 0) {
         handleClientSelect(clients[0].id);
       } else {
         setClientId('');
@@ -115,17 +134,25 @@ export const InvoiceModal: React.FC = () => {
         setClientAddress('');
       }
 
-      setLineItems([
-        {
-          id: `li-${Date.now()}`,
-          description: 'Software Engineering & Consulting Services',
-          quantity: 1,
-          unitPrice: 1500,
-          taxRate: businessProfile.defaultTaxRate,
-          discountPercent: 0,
-          amount: 1500,
-        },
-      ]);
+      if (draftInvoicePrefill?.lineItems && draftInvoicePrefill.lineItems.length > 0) {
+        setLineItems(draftInvoicePrefill.lineItems);
+      } else {
+        setLineItems([
+          {
+            id: `li-${Date.now()}`,
+            description: 'Software Engineering & Consulting Services',
+            quantity: 1,
+            unitPrice: 1500,
+            taxRate: businessProfile.defaultTaxRate,
+            discountPercent: 0,
+            amount: 1500,
+          },
+        ]);
+      }
+
+      if (draftInvoicePrefill) {
+        setDraftInvoicePrefill(null);
+      }
 
       setIsRecurring(false);
       setRecurringFrequency('monthly');
@@ -134,7 +161,7 @@ export const InvoiceModal: React.FC = () => {
       setRecurringNextRun(nextMonth.toISOString().split('T')[0]);
       setRecurringAutoSend(true);
     }
-  }, [isInvoiceModalOpen, selectedInvoiceForEdit]);
+  }, [isInvoiceModalOpen, selectedInvoiceForEdit, draftInvoicePrefill]);
 
   const handleClientSelect = (id: string) => {
     setClientId(id);
@@ -311,6 +338,19 @@ export const InvoiceModal: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsInvoiceModalOpen(false);
+                openCameraScanner('sales');
+              }}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+              title="Scan physical sales invoice or order slip with camera"
+            >
+              <Camera className="w-3.5 h-3.5 text-slate-600" />
+              <span>Camera Scan</span>
+            </button>
+
             <button
               onClick={() => setShowAiAssistant(!showAiAssistant)}
               className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"

@@ -18,6 +18,7 @@ import {
   Receipt,
   Sparkles,
   ArrowUpRight,
+  Camera,
 } from 'lucide-react';
 import { formatCurrency } from '../utils/accountingMath';
 import { exportPurchaseInvoicePDF } from '../utils/pdfExport';
@@ -36,6 +37,7 @@ export const PurchaseInvoicesView: React.FC<{
     markPurchaseInvoicePaid,
     duplicatePurchaseInvoice,
     openPaymentModalForPurchaseInvoice,
+    openCameraScanner,
   } = useAccounting();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -129,6 +131,16 @@ export const PurchaseInvoicesView: React.FC<{
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            id="purchase-camera-scan-btn"
+            onClick={() => openCameraScanner('purchase')}
+            className="flex-1 sm:flex-none px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300/70 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs"
+            title="Scan vendor purchase bill or voucher with camera"
+          >
+            <Camera className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Camera Scan</span>
+          </button>
+
           <button
             onClick={onOpenAICopilot}
             className="flex-1 sm:flex-none px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs"

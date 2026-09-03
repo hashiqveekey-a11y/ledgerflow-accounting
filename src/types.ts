@@ -178,6 +178,28 @@ export interface AssetsLiabilitiesReport {
     debtToEquityRatio: number;
     solvencyRatio: number;
   };
+  // Convenience & UI projection properties
+  netWorth?: number;
+  workingCapital?: number;
+  currentRatio?: number;
+  assets?: {
+    cashAndEquivalents: number;
+    accountsReceivable: number;
+    inventoryValue: number;
+    otherCurrentAssets: number;
+    currentAssetsTotal: number;
+    fixedAssets: number;
+    totalAssets: number;
+  };
+  liabilities?: {
+    accountsPayable: number;
+    salesTaxPayable: number;
+    accruedExpenses: number;
+    shortTermLoans: number;
+    currentLiabilitiesTotal: number;
+    longTermLiabilities: number;
+    totalLiabilities: number;
+  };
 }
 
 export interface LineItem {
@@ -371,6 +393,8 @@ export interface ProfitAndLossReport {
   estimatedTaxProvision: number;
   netIncome: number;
   netProfitMarginPercentage: number;
+  costOfGoodsSold?: number;
+  operatingIncome?: number;
 }
 
 export interface BalanceSheetReport {
@@ -436,6 +460,13 @@ export interface CashFlowReport {
   endingCash: number;
   burnRateMonthly: number;
   runwayMonths: number;
+  // Convenience & UI projection properties
+  operatingActivities?: {
+    netOperatingCash: number;
+    netCashFromOperations: number;
+  };
+  netChangeInCash?: number;
+  cashAtEndOfPeriod?: number;
 }
 
 export interface TaxDeductionSummary {
@@ -482,6 +513,17 @@ export interface AIChatIntentAction {
     | 'export_report_pdf'
     | 'open_client_modal'
     | 'create_client'
+    | 'open_vendor_modal'
+    | 'create_vendor'
+    | 'open_inventory_modal'
+    | 'create_inventory_item'
+    | 'open_stock_adjustment'
+    | 'open_voucher_modal'
+    | 'open_receipt_scanner'
+    | 'scan_receipt'
+    | 'open_copilot'
+    | 'open_voice_commander'
+    | 'close_modals'
     | 'reconcile_transactions'
     | 'run_recurring'
     | 'navigate_tab'
@@ -547,6 +589,58 @@ export interface AIReceiptScanResult {
   deductiblePercentage: number;
   confidenceScore: number;
   notes: string;
+}
+
+export type CameraScanMode = 'sales' | 'purchase';
+
+export interface ScannedSalesDocument {
+  documentType: 'sales';
+  clientName: string;
+  clientCompany?: string;
+  clientEmail?: string;
+  clientAddress?: string;
+  invoiceNumber?: string;
+  issueDate: string;
+  dueDate: string;
+  lineItems: {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    taxRate: number;
+    amount: number;
+  }[];
+  subtotal: number;
+  taxTotal: number;
+  totalAmount: number;
+  notes?: string;
+  confidenceScore: number;
+}
+
+export interface ScannedPurchaseDocument {
+  documentType: 'purchase';
+  vendorName: string;
+  vendorEmail?: string;
+  vendorTaxId?: string;
+  vendorPhone?: string;
+  vendorAddress?: string;
+  billNumber?: string;
+  issueDate: string;
+  dueDate: string;
+  category: string;
+  lineItems: {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    taxRate: number;
+    amount: number;
+    ledgerAccountName?: string;
+  }[];
+  subtotal: number;
+  taxTotal: number;
+  totalAmount: number;
+  paymentMethod?: string;
+  notes?: string;
+  confidenceScore: number;
 }
 
 export interface AutomationLog {
@@ -694,6 +788,9 @@ export interface DaybookEntry {
   netEffect: number; // positive = net cash inflow, negative = outflow
   sourceId: string;
   sourceType: 'invoice' | 'purchase_invoice' | 'payment_voucher' | 'expense' | 'bank_transaction';
+  // Convenience & projection properties
+  accountOrEntity?: string;
+  status?: string;
 }
 
 export interface DaybookSummary {
@@ -703,6 +800,8 @@ export interface DaybookSummary {
   netDayBalance: number;
   entryCount: number;
   entries: DaybookEntry[];
+  totalDebit?: number;
+  totalCredit?: number;
 }
 
 export interface SalesReportSummary {
@@ -715,6 +814,9 @@ export interface SalesReportSummary {
   paidInvoiceCount: number;
   overdueInvoiceCount: number;
   averageInvoiceValue: number;
+  totalInvoices?: number;
+  paidSales?: number;
+  unpaidSales?: number;
   byClient: {
     clientName: string;
     invoiceCount: number;
@@ -722,6 +824,8 @@ export interface SalesReportSummary {
     amountPaid: number;
     outstanding: number;
     percentage: number;
+    totalInvoiced?: number;
+    balanceDue?: number;
   }[];
   byMonth: {
     month: string;
@@ -747,6 +851,10 @@ export interface PurchaseReportSummary {
   paidBillCount: number;
   overdueBillCount: number;
   averageBillValue: number;
+  totalBills?: number;
+  paidPurchases?: number;
+  unpaidPurchases?: number;
+  totalTaxPaid?: number;
   byVendor: {
     vendorName: string;
     billCount: number;
@@ -754,6 +862,7 @@ export interface PurchaseReportSummary {
     amountPaid: number;
     balanceDue: number;
     percentage: number;
+    totalBilled?: number;
   }[];
   byCategory: {
     category: ExpenseCategory;
@@ -779,6 +888,11 @@ export interface TaxReportSummary {
   totalInputTaxCredit: number; // Total ITC
   netTaxPayableOrRefund: number; // Output Tax - Input Tax (positive = payable, negative = refund)
   effectiveTaxRatePercentage: number;
+  totalOutputTax?: number;
+  totalInputTax?: number;
+  netTaxLiability?: number;
+  totalDeductibleExpenses?: number;
+  estimatedTaxableIncome?: number;
   breakdownByRate: {
     ratePercent: number;
     salesBase: number;
@@ -793,6 +907,12 @@ export interface TaxReportSummary {
     deductiblePercentage: number;
     deductibleAmount: number;
   }[];
+  deductionsByCategory?: {
+    category: ExpenseCategory;
+    amount: number;
+    grossAmount: number;
+    deductiblePercentage: number;
+  }[];
 }
 
 export interface InventoryReportSummary {
@@ -805,6 +925,11 @@ export interface InventoryReportSummary {
   overallAverageGrossMarginPercent: number;
   lowStockItemsCount: number;
   outOfStockItemsCount: number;
+  totalInventoryValue?: number;
+  totalUnitsOnHand?: number;
+  potentialRetailValue?: number;
+  potentialGrossMargin?: number;
+  lowStockItemCount?: number;
   categoryValuation: {
     category: InventoryCategory;
     itemCount: number;
@@ -844,6 +969,12 @@ export interface AllInOneReportSummary {
   taxReport: TaxReportSummary;
   inventoryReport: InventoryReportSummary;
   daybookSnapshot: DaybookSummary;
+  // Convenience aliases
+  sales?: any;
+  purchases?: any;
+  tax?: any;
+  inventory?: any;
+  daybook?: any;
 }
 
 export type TabType =

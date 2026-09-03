@@ -27,6 +27,10 @@ import {
   PieChart,
   ShoppingBag,
   PlusCircle,
+  Globe,
+  Languages,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
 
 export const VoiceCommanderModal: React.FC<{
@@ -44,6 +48,7 @@ export const VoiceCommanderModal: React.FC<{
     history,
     settings,
     availableVoices,
+    supportedLanguages,
     startListening,
     stopListening,
     toggleListening,
@@ -59,6 +64,7 @@ export const VoiceCommanderModal: React.FC<{
   const [activeTab, setActiveTabState] = useState<'voice' | 'history' | 'settings'>('voice');
   const [typedCommand, setTypedCommand] = useState('');
   const [isProcessingManual, setIsProcessingManual] = useState(false);
+  const [customTestPhrase, setCustomTestPhrase] = useState('Created invoice number 4 for A-B-C with 1 piece of T-T-T at rate 5 dollars.');
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -86,15 +92,18 @@ export const VoiceCommanderModal: React.FC<{
   };
 
   const sampleCommands = [
-    { label: '📄 Create Invoice for $500', cmd: 'Create invoice for 500 dollars' },
-    { label: '💳 Log $150 Office Expense', cmd: 'Record purchase of 150 dollars for Office Supplies' },
-    { label: '📊 What is my Net Income?', cmd: 'What is my net income?' },
-    { label: '⏳ What is my Cash Runway?', cmd: 'What is my cash runway?' },
-    { label: '🧾 Scan Receipt with OCR', cmd: 'Scan receipt' },
-    { label: '📈 Go to Financial Reports', cmd: 'Go to reports' },
-    { label: '📦 Check Inventory & Stock', cmd: 'Go to inventory' },
-    { label: '👥 Add New Client', cmd: 'Add new client' },
-    { label: '💱 Switch Currency to EUR', cmd: 'Switch currency to EUR' },
+    { label: '⚡ Create invoice in abc name with ttt item 1 pc at rate 5', cmd: 'create invoice in abc name with ttt item 1 pc at rate 5' },
+    { label: '📄 Open Invoice Creator Modal', cmd: 'open invoice modal' },
+    { label: '🛒 Open Purchase Bill Modal', cmd: 'open purchase invoice modal' },
+    { label: '🧾 Open Receipt Scanner (OCR)', cmd: 'open receipt scanner' },
+    { label: '👥 Open Client Directory / Modal', cmd: 'open client modal' },
+    { label: '📦 Open Inventory Management', cmd: 'open inventory' },
+    { label: '🤖 Open AI Financial Copilot', cmd: 'open ai copilot' },
+    { label: '📊 Open Financial Reports', cmd: 'open reports' },
+    { label: '💳 Record Expense $150', cmd: 'open expense modal' },
+    { label: '💰 What is my Net Income?', cmd: 'What is my net income?' },
+    { label: '⏳ Cash Runway & Burn Rate', cmd: 'What is my cash runway?' },
+    { label: '❌ Close All Modals', cmd: 'close all modals' },
   ];
 
   return (
@@ -214,7 +223,7 @@ export const VoiceCommanderModal: React.FC<{
               }`}
             >
               <Sliders className="w-3.5 h-3.5" />
-              VoiceOver Settings
+              Pronunciation & Voice Settings
             </button>
           </div>
 
@@ -231,7 +240,30 @@ export const VoiceCommanderModal: React.FC<{
         {/* Tab Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
           {activeTab === 'voice' && (
-            <div className="space-y-5">
+            <div className="space-y-4">
+              {/* Pronunciation & Accent Quick Status Bar */}
+              <div className="flex items-center justify-between px-3 py-2 bg-slate-100/90 rounded-xl border border-slate-200/80 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">
+                    {supportedLanguages.find((l) => l.code === (settings.language || 'en-US'))?.flag || '🌐'}
+                  </span>
+                  <span className="text-slate-600">
+                    Pronunciation Dialect: <strong className="text-slate-900">{supportedLanguages.find((l) => l.code === (settings.language || 'en-US'))?.name || 'English (US)'}</strong>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold uppercase tracking-wider">
+                    {settings.clarityMode === 'crisp_slow' ? '0.85x Deliberate' : settings.clarityMode === 'natural' ? '1.0x Natural' : '0.92x High Clarity'}
+                  </span>
+                </div>
+                <button
+                  id="voice-quick-tune-pronunciation-btn"
+                  onClick={() => setActiveTabState('settings')}
+                  className="text-emerald-700 hover:text-emerald-800 font-bold hover:underline flex items-center gap-1 text-[11px]"
+                >
+                  <Sliders className="w-3 h-3" />
+                  Adjust Accent / Speed
+                </button>
+              </div>
+
               {/* Interactive Audio Wave & Visualizer Hero */}
               <div className="relative rounded-2xl bg-gradient-to-b from-slate-950 to-slate-900 p-6 text-center text-white border border-slate-800 shadow-inner overflow-hidden">
                 {/* Background ambient glow */}
@@ -466,105 +498,366 @@ export const VoiceCommanderModal: React.FC<{
           )}
 
           {activeTab === 'settings' && (
-            <div className="space-y-5">
+            <div className="space-y-6">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">VoiceOver & Speech Configuration</h3>
-                <p className="text-xs text-slate-500">Customize audio synthesis, voice timbre, speech rate and feedback</p>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Languages className="w-4 h-4 text-emerald-600" />
+                  Spoken Language & Pronunciation Clarity
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Customize pronunciation accent, enunciation cadence, and phonetic number normalization so speech is always crisp and clear.
+                </p>
               </div>
 
-              {/* Automatic Readout Toggle */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <h4 className="text-sm font-bold text-slate-900">Auto-Spoken VoiceOver Feedback</h4>
-                  <p className="text-xs text-slate-500">Speak confirmations and financial answers aloud automatically</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    id="voice-toggle-autospeak-switch"
-                    type="checkbox"
-                    checked={settings.autoSpeakResponses}
-                    onChange={(e) => updateSettings({ autoSpeakResponses: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                </label>
-              </div>
-
-              {/* Sound Effects Toggle */}
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <h4 className="text-sm font-bold text-slate-900">Audio UI Chimes</h4>
-                  <p className="text-xs text-slate-500">Play pleasant melodic tones on speech activation and action success</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    id="voice-toggle-chimes-switch"
-                    type="checkbox"
-                    checked={settings.soundEffectsEnabled}
-                    onChange={(e) => updateSettings({ soundEffectsEnabled: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                </label>
-              </div>
-
-              {/* Voice Selector */}
-              {availableVoices.length > 0 && (
-                <div className="space-y-1.5">
-                  <label htmlFor="voice-select" className="text-xs font-bold text-slate-700">
-                    Voiceover Persona & Voice Profile
-                  </label>
-                  <select
-                    id="voice-select"
-                    value={settings.voiceUri}
-                    onChange={(e) => updateSettings({ voiceUri: e.target.value })}
-                    className="w-full text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                  >
-                    <option value="">Default Natural Voice (Recommended)</option>
-                    {availableVoices
-                      .filter((v) => v.lang.startsWith('en'))
-                      .map((voice) => (
-                        <option key={voice.voiceURI} value={voice.voiceURI}>
-                          {voice.name} ({voice.lang})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Speech Rate Slider */}
+              {/* Pronunciation Dialect & Regional Accent */}
               <div className="space-y-2">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-700">
-                  <span>Voice Speed / Rate:</span>
-                  <span className="text-emerald-700">{settings.speechRate.toFixed(1)}x</span>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-slate-500" />
+                    Pronunciation Dialect & Accent
+                  </label>
+                  <span className="text-[11px] text-slate-400">Affects both voice synthesis and microphone recognition</span>
                 </div>
-                <input
-                  id="voice-speed-slider"
-                  type="range"
-                  min="0.8"
-                  max="1.5"
-                  step="0.1"
-                  value={settings.speechRate}
-                  onChange={(e) => updateSettings({ speechRate: parseFloat(e.target.value) })}
-                  className="w-full accent-emerald-600 cursor-pointer"
-                />
-                <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                  <span>0.8x (Deliberate)</span>
-                  <span>1.0x (Standard)</span>
-                  <span>1.5x (Fast)</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {supportedLanguages.map((lang) => {
+                    const isSelected = (settings.language || 'en-US') === lang.code;
+                    return (
+                      <button
+                        key={lang.code}
+                        id={`voice-lang-select-${lang.code.toLowerCase()}`}
+                        onClick={() => {
+                          updateSettings({ language: lang.code, voiceUri: '' });
+                          speak(`Pronunciation dialect set to ${lang.name}.`);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all relative ${
+                          isSelected
+                            ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xl">{lang.flag}</span>
+                          {isSelected && <Check className="w-4 h-4 text-emerald-600" />}
+                        </div>
+                        <div className="text-xs font-bold text-slate-900">{lang.name}</div>
+                        <div className="text-[10px] text-slate-500 leading-tight mt-0.5">{lang.clarityTip}</div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Test Voice Button */}
-              <div className="pt-2">
-                <button
-                  id="voice-test-sample-btn"
-                  onClick={() => speak(`VoiceOver active. Net Income is ${formatCurrency(profitAndLoss.netIncome, selectedCurrency)} with ${cashFlow.runwayMonths.toFixed(1)} months of cash runway.`)}
-                  className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+              {/* Clarity & Enunciation Mode */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    Pronunciation Clarity & Cadence
+                  </label>
+                  <span className="text-[11px] text-slate-400">Pacing & syllable articulation</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    id="voice-clarity-high-btn"
+                    onClick={() => {
+                      updateSettings({ clarityMode: 'high_clarity', speechRate: 0.92 });
+                      speak('High clarity mode activated. Syllables and numbers are articulated clearly.');
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      settings.clarityMode === 'high_clarity' || (!settings.clarityMode && settings.speechRate === 0.92)
+                        ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-900">
+                      <span>💎 High Clarity</span>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-mono">0.92x</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                      Slightly measured pace with clear syllable stress. Recommended for numbers and currency.
+                    </p>
+                  </button>
+
+                  <button
+                    id="voice-clarity-slow-btn"
+                    onClick={() => {
+                      updateSettings({ clarityMode: 'crisp_slow', speechRate: 0.85 });
+                      speak('Deliberate mode activated. Slower pace for maximum comprehension.');
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      settings.clarityMode === 'crisp_slow' || settings.speechRate <= 0.85
+                        ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-900">
+                      <span>🐢 Crisp & Deliberate</span>
+                      <span className="text-[10px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded font-mono">0.85x</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                      Slower rate with distinct breathing pauses between amounts, client names, and IDs.
+                    </p>
+                  </button>
+
+                  <button
+                    id="voice-clarity-natural-btn"
+                    onClick={() => {
+                      updateSettings({ clarityMode: 'natural', speechRate: 1.0 });
+                      speak('Natural speed mode activated.');
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      settings.clarityMode === 'natural' || settings.speechRate === 1.0
+                        ? 'bg-emerald-50/80 border-emerald-500 ring-2 ring-emerald-500/20'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-900">
+                      <span>⚡ Natural Pace</span>
+                      <span className="text-[10px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded font-mono">1.0x</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1 leading-normal">
+                      Standard conversational speed for fast interactions.
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Phonetic Normalization Toggle */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold text-slate-900">Phonetic Currency & Acronym Normalization</h4>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">Recommended</span>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Converts symbols and codes into clear phonetic words before speaking: converts <strong>$5.00</strong> to <em>"5 dollars"</em>, <strong>INV-2026-0004</strong> to <em>"invoice number 4"</em>, <strong>1 pc</strong> to <em>"1 piece"</em>, and expands test acronyms like <strong>TTT</strong> to <em>"T-T-T"</em> so the voice never mumbles or mispronounces terms.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
+                  <input
+                    id="voice-toggle-phonetic-switch"
+                    type="checkbox"
+                    checked={settings.phoneticPronunciation !== false}
+                    onChange={(e) => updateSettings({ phoneticPronunciation: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
+
+              {/* Voice Profile Selector (Filtered to active language) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="voice-select" className="text-xs font-bold text-slate-700">
+                    Speech Synthesizer Voice Profile
+                  </label>
+                  <span className="text-[10px] text-slate-400">
+                    Showing voices for {supportedLanguages.find((l) => l.code === (settings.language || 'en-US'))?.name || 'English'}
+                  </span>
+                </div>
+                <select
+                  id="voice-select"
+                  value={settings.voiceUri}
+                  onChange={(e) => updateSettings({ voiceUri: e.target.value })}
+                  className="w-full text-xs font-semibold px-3 py-2.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 >
-                  <Volume2 className="w-4 h-4 text-emerald-400" />
-                  Test Voice & Settings
-                </button>
+                  <option value="">⭐ Default Natural High-Clarity Voice (Recommended)</option>
+                  {availableVoices
+                    .filter((v) => {
+                      const prefix = (settings.language || 'en-US').split('-')[0].toLowerCase();
+                      return v.lang.toLowerCase().replace('_', '-').startsWith(prefix);
+                    })
+                    .sort((a, b) => {
+                      const aIsNatural = a.name.includes('Natural') || a.name.includes('Google') || a.name.includes('Samantha') || a.name.includes('Daniel') || a.name.includes('Rishi');
+                      const bIsNatural = b.name.includes('Natural') || b.name.includes('Google') || b.name.includes('Samantha') || b.name.includes('Daniel') || b.name.includes('Rishi');
+                      if (aIsNatural && !bIsNatural) return -1;
+                      if (!aIsNatural && bIsNatural) return 1;
+                      return a.name.localeCompare(b.name);
+                    })
+                    .map((voice) => {
+                      const isHighQuality = voice.name.includes('Natural') || voice.name.includes('Google') || voice.name.includes('Premium') || voice.name.includes('Enhanced');
+                      return (
+                        <option key={voice.voiceURI} value={voice.voiceURI}>
+                          {isHighQuality ? '⭐ ' : ''}{voice.name} ({voice.lang})
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+
+              {/* Speech Rate & Pitch Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50/70 rounded-xl border border-slate-200">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                    <span>Speed / Rate:</span>
+                    <span className="text-emerald-700 font-mono">{settings.speechRate.toFixed(2)}x</span>
+                  </div>
+                  <input
+                    id="voice-speed-slider"
+                    type="range"
+                    min="0.75"
+                    max="1.30"
+                    step="0.05"
+                    value={settings.speechRate}
+                    onChange={(e) => updateSettings({ speechRate: parseFloat(e.target.value) })}
+                    className="w-full accent-emerald-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>0.75x (Very Clear)</span>
+                    <span>0.92x (Ideal)</span>
+                    <span>1.30x (Fast)</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-700">
+                    <span>Voice Pitch / Tone:</span>
+                    <span className="text-emerald-700 font-mono">{settings.speechPitch.toFixed(2)}x</span>
+                  </div>
+                  <input
+                    id="voice-pitch-slider"
+                    type="range"
+                    min="0.80"
+                    max="1.20"
+                    step="0.05"
+                    value={settings.speechPitch}
+                    onChange={(e) => updateSettings({ speechPitch: parseFloat(e.target.value) })}
+                    className="w-full accent-emerald-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400">
+                    <span>0.80x (Deeper)</span>
+                    <span>1.00x (Neutral)</span>
+                    <span>1.20x (Higher)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Audio UI Chimes & Auto-Spoken Toggles */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-slate-900">Auto-Spoken Confirmation</h4>
+                    <p className="text-[10px] text-slate-500">Speak answers and confirmations aloud</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      id="voice-toggle-autospeak-switch"
+                      type="checkbox"
+                      checked={settings.autoSpeakResponses}
+                      onChange={(e) => updateSettings({ autoSpeakResponses: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+
+                <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-bold text-slate-900">Audio UI Chimes</h4>
+                    <p className="text-[10px] text-slate-500">Melodic chimes on listening & success</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      id="voice-toggle-chimes-switch"
+                      type="checkbox"
+                      checked={settings.soundEffectsEnabled}
+                      onChange={(e) => updateSettings({ soundEffectsEnabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Pronunciation Audition & Studio */}
+              <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-emerald-400" />
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Pronunciation Audition Studio</h4>
+                  </div>
+                  {isSpeaking && (
+                    <button
+                      onClick={stopSpeaking}
+                      className="px-2 py-0.5 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/40 rounded text-[10px] font-bold flex items-center gap-1"
+                    >
+                      <Square className="w-2.5 h-2.5 fill-rose-300" />
+                      Stop Speaking
+                    </button>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-300">
+                  Click any sample phrase below to test how the current dialect and pronunciation engine enunciate currency, invoice IDs, and product names:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    id="voice-test-invoice-btn"
+                    onClick={() => speak('Created invoice number 4 for A-B-C with 1 piece of T-T-T at the rate of 5 dollars. Total invoice amount is 5 dollars.')}
+                    className="p-2.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-left transition-colors"
+                  >
+                    <div className="text-[11px] font-bold text-emerald-300 flex items-center gap-1">
+                      <Play className="w-3 h-3 fill-emerald-400 text-emerald-400" />
+                      Invoice & Items Test
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1 line-clamp-2">
+                      "Created invoice number 4 for A-B-C with 1 piece of T-T-T at rate 5 dollars."
+                    </div>
+                  </button>
+
+                  <button
+                    id="voice-test-finance-btn"
+                    onClick={() => speak(`Financial summary: Net Income is ${formatCurrency(profitAndLoss.netIncome, selectedCurrency)} with ${cashFlow.runwayMonths.toFixed(1)} months of cash runway.`)}
+                    className="p-2.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-left transition-colors"
+                  >
+                    <div className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                      <Play className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      Financial Health Test
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1 line-clamp-2">
+                      "Net income is 14,200 dollars with 8.5 months of cash runway."
+                    </div>
+                  </button>
+
+                  <button
+                    id="voice-test-inventory-btn"
+                    onClick={() => speak('Profit and Loss statement: Cost of Goods Sold is 3,200 dollars. Gross profit margin is 68 percent.')}
+                    className="p-2.5 bg-slate-800 hover:bg-slate-700/80 border border-slate-700 rounded-xl text-left transition-colors"
+                  >
+                    <div className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                      <Play className="w-3 h-3 fill-cyan-400 text-cyan-400" />
+                      Accounting & P&L Test
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1 line-clamp-2">
+                      "Profit and Loss statement: Cost of Goods Sold is 3,200 dollars."
+                    </div>
+                  </button>
+                </div>
+
+                {/* Custom Phrase Input */}
+                <div className="pt-2 border-t border-slate-800 flex gap-2">
+                  <input
+                    id="voice-custom-test-phrase-input"
+                    type="text"
+                    value={customTestPhrase}
+                    onChange={(e) => setCustomTestPhrase(e.target.value)}
+                    placeholder="Type any word or phrase to test pronunciation..."
+                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    id="voice-speak-custom-phrase-btn"
+                    onClick={() => {
+                      if (customTestPhrase.trim()) {
+                        speak(customTestPhrase);
+                      }
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors flex-shrink-0"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    Speak Phrase
+                  </button>
+                </div>
               </div>
             </div>
           )}

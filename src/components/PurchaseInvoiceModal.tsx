@@ -13,6 +13,7 @@ import {
   Tag,
   ShieldCheck,
   Check,
+  Camera,
 } from 'lucide-react';
 import { formatCurrency } from '../utils/accountingMath';
 
@@ -22,10 +23,13 @@ export const PurchaseInvoiceModal: React.FC = () => {
     setIsPurchaseInvoiceModalOpen,
     selectedPurchaseInvoiceForEdit,
     setSelectedPurchaseInvoiceForEdit,
+    draftPurchaseInvoicePrefill,
+    setDraftPurchaseInvoicePrefill,
     addPurchaseInvoice,
     updatePurchaseInvoice,
     selectedCurrency,
     ledgerAccounts,
+    openCameraScanner,
   } = useAccounting();
 
   const isEditMode = !!selectedPurchaseInvoiceForEdit;
@@ -91,30 +95,40 @@ export const PurchaseInvoiceModal: React.FC = () => {
     } else {
       // Auto-generate next bill number
       const randomBillNum = `BILL-${Math.floor(1000 + Math.random() * 9000)}`;
-      setBillNumber(randomBillNum);
-      setVendorName('');
-      setVendorEmail('');
-      setVendorTaxId('');
-      setVendorPhone('');
-      setIssueDate(new Date().toISOString().split('T')[0]);
-      setDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
-      setCategory('Software, Cloud & SaaS');
+      setBillNumber(draftPurchaseInvoicePrefill?.billNumber || randomBillNum);
+      setVendorName(draftPurchaseInvoicePrefill?.vendorName || '');
+      setVendorEmail(draftPurchaseInvoicePrefill?.vendorEmail || '');
+      setVendorTaxId(draftPurchaseInvoicePrefill?.vendorTaxId || '');
+      setVendorPhone(draftPurchaseInvoicePrefill?.vendorPhone || '');
+      setIssueDate(draftPurchaseInvoicePrefill?.issueDate || new Date().toISOString().split('T')[0]);
+      setDueDate(
+        draftPurchaseInvoicePrefill?.dueDate ||
+          new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+      );
+      setCategory(draftPurchaseInvoicePrefill?.category || 'Software, Cloud & SaaS');
       setStatus('pending');
-      setNotes('');
-      setLineItems([
-        {
-          id: `item-${Date.now()}`,
-          description: '',
-          quantity: 1,
-          unitPrice: 0,
-          taxRate: 8,
-          ledgerAccountId: 'acc-5020',
-          ledgerAccountName: 'Software, Cloud & SaaS Subscriptions',
-          amount: 0,
-        },
-      ]);
+      setNotes(draftPurchaseInvoicePrefill?.notes || '');
+      if (draftPurchaseInvoicePrefill?.lineItems && draftPurchaseInvoicePrefill.lineItems.length > 0) {
+        setLineItems(draftPurchaseInvoicePrefill.lineItems);
+      } else {
+        setLineItems([
+          {
+            id: `item-${Date.now()}`,
+            description: '',
+            quantity: 1,
+            unitPrice: 0,
+            taxRate: 8,
+            ledgerAccountId: 'acc-5020',
+            ledgerAccountName: 'Software, Cloud & SaaS Subscriptions',
+            amount: 0,
+          },
+        ]);
+      }
+      if (draftPurchaseInvoicePrefill) {
+        setDraftPurchaseInvoicePrefill(null);
+      }
     }
-  }, [selectedPurchaseInvoiceForEdit, isPurchaseInvoiceModalOpen]);
+  }, [selectedPurchaseInvoiceForEdit, isPurchaseInvoiceModalOpen, draftPurchaseInvoicePrefill]);
 
   if (!isPurchaseInvoiceModalOpen) return null;
 
@@ -235,12 +249,27 @@ export const PurchaseInvoiceModal: React.FC = () => {
             </p>
           </div>
 
-          <button
-            onClick={handleClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsPurchaseInvoiceModalOpen(false);
+                openCameraScanner('purchase');
+              }}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+              title="Scan physical purchase bill or vendor receipt with camera"
+            >
+              <Camera className="w-3.5 h-3.5 text-slate-600" />
+              <span>Camera Scan</span>
+            </button>
+
+            <button
+              onClick={handleClose}
+              className="p-1.5 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Form Body */}

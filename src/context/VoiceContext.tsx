@@ -3,6 +3,18 @@ import { useAccounting } from './AccountingContext';
 import { formatCurrency } from '../utils/accountingMath';
 import { soundEffects } from '../utils/audioChimes';
 import { CurrencyCode, TabType } from '../types';
+import {
+  parseInvoiceVoiceCommand,
+  parsePurchaseVoiceCommand,
+  parseVoiceOpenIntent,
+} from '../utils/voiceCommandParser';
+import {
+  formatTextForSpeech,
+  selectBestVoice,
+  SUPPORTED_VOICE_LANGUAGES,
+  VoiceLanguageOption,
+  getClarityAudioConfig,
+} from '../utils/speechPronunciation';
 
 export interface VoiceHistoryItem {
   id: string;
@@ -17,9 +29,12 @@ export interface VoiceSettings {
   enabled: boolean;
   autoSpeakResponses: boolean;
   soundEffectsEnabled: boolean;
-  speechRate: number; // 0.8 - 1.5
+  speechRate: number; // 0.8 - 1.5, default 0.92 for crystal-clear diction
   speechPitch: number; // 0.8 - 1.2
   voiceUri: string;
+  language: string; // 'en-US' | 'en-IN' | 'en-GB' | 'en-AU' | 'en-CA'
+  clarityMode: 'high_clarity' | 'natural' | 'crisp_slow';
+  phoneticPronunciation: boolean;
 }
 
 interface VoiceContextType {
@@ -33,6 +48,7 @@ interface VoiceContextType {
   history: VoiceHistoryItem[];
   settings: VoiceSettings;
   availableVoices: SpeechSynthesisVoice[];
+  supportedLanguages: VoiceLanguageOption[];
   isVoiceWidgetOpen: boolean;
   liveAnnouncement: string;
   startListening: () => void;
@@ -73,6 +89,21 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsClientModalOpen,
     setIsVendorModalOpen,
     setIsLedgerModalOpen,
+    isAICopilotOpen,
+    setIsAICopilotOpen,
+    isReceiptScannerOpen,
+    setIsReceiptScannerOpen,
+    isInventoryModalOpen,
+    setIsInventoryModalOpen,
+    isStockAdjustmentModalOpen,
+    setIsStockAdjustmentModalOpen,
+    isPaymentVoucherModalOpen,
+    setIsPaymentVoucherModalOpen,
+    openInvoiceModalWithDraft,
+    openPurchaseInvoiceModalWithDraft,
+    createInvoiceDirect,
+    createPurchaseInvoiceDirect,
+    closeAllModals,
     businessProfile,
     runAutomatedRecurringEngine,
     lockSession,
@@ -102,24 +133,42 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [settings, setSettings] = useState<VoiceSettings>(() => {
     try {
       const saved = localStorage.getItem('ledgerflow_voice_settings');
-      return saved
-        ? JSON.parse(saved)
-        : {
-            enabled: true,
-            autoSpeakResponses: true,
-            soundEffectsEnabled: true,
-            speechRate: 1.0,
-            speechPitch: 1.0,
-            voiceUri: '',
-          };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          enabled: parsed.enabled ?? true,
+          autoSpeakResponses: parsed.autoSpeakResponses ?? true,
+          soundEffectsEnabled: parsed.soundEffectsEnabled ?? true,
+          speechRate: parsed.speechRate ?? 0.92,
+          speechPitch: parsed.speechPitch ?? 1.0,
+          voiceUri: parsed.voiceUri ?? '',
+          language: parsed.language ?? 'en-US',
+          clarityMode: parsed.clarityMode ?? 'high_clarity',
+          phoneticPronunciation: parsed.phoneticPronunciation ?? true,
+        };
+      }
+      return {
+        enabled: true,
+        autoSpeakResponses: true,
+        soundEffectsEnabled: true,
+        speechRate: 0.92,
+        speechPitch: 1.0,
+        voiceUri: '',
+        language: 'en-US',
+        clarityMode: 'high_clarity',
+        phoneticPronunciation: true,
+      };
     } catch {
       return {
         enabled: true,
         autoSpeakResponses: true,
         soundEffectsEnabled: true,
-        speechRate: 1.0,
+        speechRate: 0.92,
         speechPitch: 1.0,
         voiceUri: '',
+        language: 'en-US',
+        clarityMode: 'high_clarity',
+        phoneticPronunciation: true,
       };
     }
   });
@@ -161,7 +210,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 3000);
   }, []);
 
-  // Text-To-Speech function
+  // Text-To-Speech function with phonetic pronunciation enhancement & clarity tuning
   const speak = useCallback(
     (text: string, onEnd?: () => void) => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window) || !settings.autoSpeakResponses) {
@@ -170,19 +219,23 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
 
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = settings.speechRate || 1.0;
+
+      // Format text phonetically for clear, natural human pronunciation
+      const spokenText = settings.phoneticPronunciation !== false
+        ? formatTextForSpeech(text, { currencyCode: selectedCurrency, clarityMode: settings.clarityMode })
+        : text;
+
+      const utterance = new SpeechSynthesisUtterance(spokenText);
+      utterance.rate = settings.speechRate || 0.92;
       utterance.pitch = settings.speechPitch || 1.0;
 
-      if (settings.voiceUri && availableVoices.length > 0) {
-        const foundVoice = availableVoices.find((v) => v.voiceURI === settings.voiceUri);
-        if (foundVoice) utterance.voice = foundVoice;
-      } else if (availableVoices.length > 0) {
-        // Prefer natural English voices
-        const enVoice = availableVoices.find(
-          (v) => (v.lang.startsWith('en') && v.name.includes('Natural')) || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel')
-        ) || availableVoices.find((v) => v.lang.startsWith('en'));
-        if (enVoice) utterance.voice = enVoice;
+      // Select highest clarity voice matching target dialect / language
+      const chosenVoice = selectBestVoice(availableVoices, settings.language || 'en-US', settings.voiceUri);
+      if (chosenVoice) {
+        utterance.voice = chosenVoice;
+        utterance.lang = chosenVoice.lang;
+      } else {
+        utterance.lang = settings.language || 'en-US';
       }
 
       utterance.onstart = () => {
@@ -196,7 +249,8 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         onEnd?.();
       };
 
-      utterance.onerror = () => {
+      utterance.onerror = (e) => {
+        console.warn('Speech synthesis error:', e);
         setIsSpeaking(false);
         setStatus('idle');
         onEnd?.();
@@ -205,7 +259,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       window.speechSynthesis.speak(utterance);
       announce(text);
     },
-    [settings, availableVoices, announce]
+    [settings, availableVoices, selectedCurrency, announce]
   );
 
   const stopSpeaking = useCallback(() => {
@@ -229,112 +283,200 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       let success = true;
 
       try {
-        // 1. Navigation Commands
-        if (lower.includes('go to') || lower.includes('open') || lower.includes('show') || lower.includes('navigate to') || lower.includes('switch to')) {
-          if (lower.includes('dashboard') || lower.includes('home') || lower.includes('overview')) {
-            setActiveTab('dashboard');
-            responseText = 'Navigating to Dashboard overview.';
-            actionTaken = 'Navigate -> Dashboard';
-          } else if (lower.includes('invoice') || lower.includes('sales') || lower.includes('billing')) {
-            setActiveTab('invoices');
-            responseText = 'Opening Sales and Invoices.';
-            actionTaken = 'Navigate -> Invoices';
-          } else if (lower.includes('purchase') || lower.includes('bills') || lower.includes('supplier invoice') || lower.includes('purchase order')) {
-            setActiveTab('purchase_invoices');
-            responseText = 'Opening Purchase Invoices and Bills.';
-            actionTaken = 'Navigate -> Purchase Invoices';
-          } else if (lower.includes('expense') || lower.includes('spending')) {
-            setActiveTab('expenses');
-            responseText = 'Opening Expenses log.';
-            actionTaken = 'Navigate -> Expenses';
-          } else if (lower.includes('inventory') || lower.includes('stock') || lower.includes('products') || lower.includes('items')) {
-            setActiveTab('inventory');
-            responseText = 'Opening Inventory and Stock management.';
-            actionTaken = 'Navigate -> Inventory';
-          } else if (lower.includes('ledger') || lower.includes('chart of accounts') || lower.includes('accounts')) {
-            setActiveTab('ledger');
-            responseText = 'Opening General Ledger and Chart of Accounts.';
-            actionTaken = 'Navigate -> Ledger';
-          } else if (lower.includes('report') || lower.includes('p&l') || lower.includes('profit and loss') || lower.includes('balance sheet') || lower.includes('cash flow')) {
-            setActiveTab('reports');
-            responseText = 'Opening Financial Reports and Statements.';
-            actionTaken = 'Navigate -> Reports';
-          } else if (lower.includes('bank') || lower.includes('reconciliation') || lower.includes('statement')) {
-            setActiveTab('bank_feed');
-            responseText = 'Opening Bank Reconciliation and Feeds.';
-            actionTaken = 'Navigate -> Bank Feed';
-          } else if (lower.includes('client') || lower.includes('customer')) {
-            setActiveTab('clients');
-            responseText = 'Opening Customer and Client Directory.';
-            actionTaken = 'Navigate -> Clients';
-          } else if (lower.includes('vendor') || lower.includes('supplier')) {
-            setActiveTab('vendors');
-            responseText = 'Opening Vendor and Supplier Directory.';
-            actionTaken = 'Navigate -> Vendors';
-          } else if (lower.includes('voucher') || lower.includes('receipt voucher')) {
-            setActiveTab('vouchers');
-            responseText = 'Opening Payment and Receipt Vouchers.';
-            actionTaken = 'Navigate -> Vouchers';
-          } else if (lower.includes('ai insight') || lower.includes('predict') || lower.includes('intelligence')) {
-            setActiveTab('ai_insights');
-            responseText = 'Opening AI Predictive Insights.';
-            actionTaken = 'Navigate -> AI Insights';
-          } else if (lower.includes('setting') || lower.includes('preference') || lower.includes('profile')) {
-            setActiveTab('settings');
-            responseText = 'Opening Organization Settings.';
-            actionTaken = 'Navigate -> Settings';
-          }
+        // 0. Close Everything / Dismiss Modals
+        if (
+          lower.includes('close modal') ||
+          lower.includes('close dialog') ||
+          lower.includes('close window') ||
+          lower.includes('dismiss modal') ||
+          lower.includes('close everything') ||
+          lower.includes('close all') ||
+          lower === 'close'
+        ) {
+          closeAllModals();
+          responseText = 'Closed all active dialogs and returned to the main screen.';
+          actionTaken = 'Modals -> Close All';
         }
 
-        // 2. Direct Actions: Create Sale / Invoice
-        if (!responseText && (lower.includes('create invoice') || lower.includes('create sale') || lower.includes('new invoice') || lower.includes('bill client') || lower.includes('make invoice'))) {
-          // Extract amount if spoken (e.g. "for 500 dollars" or "$500")
-          const amountMatch = text.match(/\$?(\d+(\.\d{1,2})?)\s*(dollars|usd|bucks)?/i);
-          const amount = amountMatch ? parseFloat(amountMatch[1]) : 1000;
+        // 1. Parameter-Rich Invoice Creation / Opening
+        // E.g.: "create invoice in abc name with ttt item 1 pc at rate 5"
+        if (
+          !responseText &&
+          (lower.includes('invoice') || lower.includes('sale') || lower.includes('bill client') || lower.includes('make invoice'))
+        ) {
+          const parsedInv = parseInvoiceVoiceCommand(text);
+          if (parsedInv.hasDetailedParams) {
+            const isJustOpenDraft =
+              lower.startsWith('open') ||
+              lower.startsWith('draft') ||
+              lower.includes('open draft') ||
+              lower.includes('open invoice modal with');
 
-          // Extract client name if mentioned
-          let matchedClient = clients[0];
-          for (const c of clients) {
-            if (lower.includes(c.name.toLowerCase())) {
-              matchedClient = c;
-              break;
+            if (isJustOpenDraft) {
+              openInvoiceModalWithDraft({
+                clientName: parsedInv.clientName,
+                lineItems: [
+                  {
+                    id: `li-draft-${Date.now()}`,
+                    description: `${parsedInv.itemDescription}${parsedInv.unit ? ` (${parsedInv.unit})` : ''}`,
+                    quantity: parsedInv.quantity,
+                    unitPrice: parsedInv.rate,
+                    taxRate: businessProfile.defaultTaxRate ?? 8.5,
+                    discountPercent: 0,
+                    amount: parsedInv.quantity * parsedInv.rate,
+                  },
+                ],
+                notes: `Draft generated via Voice Command: "${text}".`,
+              });
+              responseText = `Opened invoice creator for ${parsedInv.clientName} prefilled with ${parsedInv.quantity} ${parsedInv.unit} of ${parsedInv.itemDescription} at rate ${formatCurrency(parsedInv.rate, selectedCurrency)}.`;
+              actionTaken = `Open Draft Invoice -> ${parsedInv.clientName}`;
+            } else {
+              // Direct creation as explicitly requested by user!
+              const newInvoice = createInvoiceDirect({
+                clientName: parsedInv.clientName,
+                items: [
+                  {
+                    description: `${parsedInv.itemDescription}${parsedInv.unit ? ` (${parsedInv.unit})` : ''}`,
+                    quantity: parsedInv.quantity,
+                    unitPrice: parsedInv.rate,
+                  },
+                ],
+                notes: `Created via Voice Command: "${text}". Payment due in 30 days.`,
+                autoOpen: true,
+              });
+              responseText = `Created and opened invoice ${newInvoice.invoiceNumber} for ${parsedInv.clientName} with ${parsedInv.quantity} ${parsedInv.unit} of ${parsedInv.itemDescription} at rate ${formatCurrency(parsedInv.rate, selectedCurrency)}. Total invoice amount is ${formatCurrency(newInvoice.totalAmount, selectedCurrency)}.`;
+              actionTaken = `Created Invoice ${newInvoice.invoiceNumber} -> ${parsedInv.clientName}`;
             }
           }
-
-          setSelectedInvoiceForEdit(null);
-          setIsInvoiceModalOpen(true);
-          responseText = `Opened Invoice Creator for ${matchedClient ? matchedClient.name : 'client'} with amount ${formatCurrency(amount, selectedCurrency)}.`;
-          actionTaken = 'Action -> Open Invoice Creator';
         }
 
-        // 3. Direct Actions: Log Purchase / Record Expense
-        if (!responseText && (lower.includes('log expense') || lower.includes('record expense') || lower.includes('new expense') || lower.includes('add expense') || lower.includes('log purchase') || lower.includes('record purchase') || lower.includes('new purchase'))) {
-          setIsExpenseModalOpen(true);
-          responseText = 'Opened Expense & Purchase logger.';
-          actionTaken = 'Action -> Open Expense Logger';
+        // 2. Parameter-Rich Purchase Bill Creation / Opening
+        if (
+          !responseText &&
+          (lower.includes('create bill') || lower.includes('make bill') || lower.includes('create purchase') || lower.includes('record bill') || lower.includes('log bill') || lower.includes('purchase invoice'))
+        ) {
+          const parsedBill = parsePurchaseVoiceCommand(text);
+          if (parsedBill.hasDetailedParams) {
+            const isJustOpenDraft =
+              lower.startsWith('open') ||
+              lower.startsWith('draft') ||
+              lower.includes('open draft') ||
+              lower.includes('open bill modal with');
+
+            if (isJustOpenDraft) {
+              openPurchaseInvoiceModalWithDraft({
+                vendorName: parsedBill.vendorName,
+                lineItems: [
+                  {
+                    id: `pi-draft-${Date.now()}`,
+                    description: `${parsedBill.itemDescription}${parsedBill.unit ? ` (${parsedBill.unit})` : ''}`,
+                    quantity: parsedBill.quantity,
+                    unitPrice: parsedBill.rate,
+                    taxRate: businessProfile.defaultTaxRate ?? 8.5,
+                    discountPercent: 0,
+                    amount: parsedBill.quantity * parsedBill.rate,
+                  },
+                ],
+                category: parsedBill.category,
+                notes: `Draft generated via Voice Command: "${text}".`,
+              });
+              responseText = `Opened purchase bill creator for ${parsedBill.vendorName} prefilled with ${parsedBill.quantity} ${parsedBill.unit} of ${parsedBill.itemDescription} at rate ${formatCurrency(parsedBill.rate, selectedCurrency)}.`;
+              actionTaken = `Open Draft Bill -> ${parsedBill.vendorName}`;
+            } else {
+              const newBill = createPurchaseInvoiceDirect({
+                vendorName: parsedBill.vendorName,
+                items: [
+                  {
+                    description: `${parsedBill.itemDescription}${parsedBill.unit ? ` (${parsedBill.unit})` : ''}`,
+                    quantity: parsedBill.quantity,
+                    unitPrice: parsedBill.rate,
+                  },
+                ],
+                category: parsedBill.category,
+                notes: `Recorded via Voice Command: "${text}".`,
+                autoOpen: true,
+              });
+              responseText = `Created and recorded bill ${newBill.billNumber} for ${parsedBill.vendorName} with ${parsedBill.quantity} ${parsedBill.unit} of ${parsedBill.itemDescription} at rate ${formatCurrency(parsedBill.rate, selectedCurrency)}. Total bill is ${formatCurrency(newBill.totalAmount, selectedCurrency)}.`;
+              actionTaken = `Created Bill ${newBill.billNumber} -> ${parsedBill.vendorName}`;
+            }
+          }
         }
 
-        // 4. Direct Actions: Scan Receipt
-        if (!responseText && (lower.includes('scan receipt') || lower.includes('upload receipt') || lower.includes('ocr receipt') || lower.includes('receipt scanner'))) {
-          // We can trigger receipt scanner via action intent or direct state
-          executeAIAction({ type: 'scan_receipt' });
-          responseText = 'Launching AI Receipt & OCR Scanner.';
-          actionTaken = 'Action -> Scan Receipt';
-        }
-
-        // 5. Direct Actions: Add Client / Vendor / Ledger Account
-        if (!responseText && (lower.includes('add client') || lower.includes('new client') || lower.includes('create client') || lower.includes('add customer'))) {
-          setIsClientModalOpen(true);
-          responseText = 'Opening New Client registration modal.';
-          actionTaken = 'Action -> Add Client';
-        } else if (!responseText && (lower.includes('add vendor') || lower.includes('new vendor') || lower.includes('create vendor') || lower.includes('add supplier'))) {
-          setIsVendorModalOpen(true);
-          responseText = 'Opening New Vendor registration modal.';
-          actionTaken = 'Action -> Add Vendor';
-        } else if (!responseText && (lower.includes('add ledger') || lower.includes('create ledger') || lower.includes('new ledger') || lower.includes('new account') || lower.includes('create account'))) {
-          setIsLedgerModalOpen(true);
-          responseText = 'Opening Chart of Accounts ledger creator.';
-          actionTaken = 'Action -> Add Ledger Account';
+        // 3. Universal "Open Everything" Intent Dispatcher (Tabs, Modals, Tools)
+        if (!responseText) {
+          const openTarget = parseVoiceOpenIntent(text);
+          if (openTarget) {
+            if (openTarget.type === 'close_all') {
+              closeAllModals();
+              responseText = 'Closed all dialogs and modals.';
+              actionTaken = 'Modals -> Close All';
+            } else if (openTarget.type === 'modal') {
+              switch (openTarget.modal) {
+                case 'invoice':
+                  setSelectedInvoiceForEdit(null);
+                  setIsInvoiceModalOpen(true);
+                  responseText = 'Opening Sales Invoice Creator modal.';
+                  actionTaken = 'Open -> Invoice Modal';
+                  break;
+                case 'purchase_invoice':
+                  setSelectedPurchaseInvoiceForEdit(null);
+                  setIsPurchaseInvoiceModalOpen(true);
+                  responseText = 'Opening Purchase Bill Creator modal.';
+                  actionTaken = 'Open -> Purchase Bill Modal';
+                  break;
+                case 'expense':
+                  setIsExpenseModalOpen(true);
+                  responseText = 'Opening Expense Logger modal.';
+                  actionTaken = 'Open -> Expense Modal';
+                  break;
+                case 'client':
+                  setIsClientModalOpen(true);
+                  responseText = 'Opening New Client registration modal.';
+                  actionTaken = 'Open -> Client Modal';
+                  break;
+                case 'vendor':
+                  setIsVendorModalOpen(true);
+                  responseText = 'Opening New Vendor registration modal.';
+                  actionTaken = 'Open -> Vendor Modal';
+                  break;
+                case 'inventory':
+                  setIsInventoryModalOpen(true);
+                  responseText = 'Opening Inventory Item Creator modal.';
+                  actionTaken = 'Open -> Inventory Modal';
+                  break;
+                case 'stock_adjustment':
+                  setIsStockAdjustmentModalOpen(true);
+                  responseText = 'Opening Stock Adjustment modal.';
+                  actionTaken = 'Open -> Stock Adjustment Modal';
+                  break;
+                case 'voucher':
+                  setIsPaymentVoucherModalOpen(true);
+                  responseText = 'Opening Payment and Receipt Voucher modal.';
+                  actionTaken = 'Open -> Voucher Modal';
+                  break;
+                case 'receipt_scanner':
+                  setIsReceiptScannerOpen(true);
+                  responseText = 'Launching AI Receipt & OCR Scanner.';
+                  actionTaken = 'Open -> Receipt Scanner';
+                  break;
+                case 'copilot':
+                  setIsAICopilotOpen(true);
+                  responseText = 'Opening AI Financial Copilot.';
+                  actionTaken = 'Open -> AI Copilot';
+                  break;
+                case 'voice_commander':
+                  setIsVoiceWidgetOpen(true);
+                  responseText = 'Opening Voice Assistant control center.';
+                  actionTaken = 'Open -> Voice Commander';
+                  break;
+              }
+            } else if (openTarget.type === 'tab') {
+              setActiveTab(openTarget.tab);
+              const tabName = openTarget.tab.replace(/_/g, ' ');
+              responseText = `Opening ${tabName.charAt(0).toUpperCase() + tabName.slice(1)}.`;
+              actionTaken = `Navigate -> ${openTarget.tab}`;
+            }
+          }
         }
 
         // 6. Voice Inquiries: Financial Health & Readouts
@@ -494,7 +636,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       recognition.continuous = false;
       recognition.interimResults = true;
-      recognition.lang = 'en-US';
+      recognition.lang = settings.language || 'en-US';
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -543,7 +685,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsListening(false);
       setStatus('error');
     }
-  }, [isSupported, processVoiceCommand]);
+  }, [isSupported, processVoiceCommand, settings.language]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -606,6 +748,7 @@ export const VoiceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         history,
         settings,
         availableVoices,
+        supportedLanguages: SUPPORTED_VOICE_LANGUAGES,
         isVoiceWidgetOpen,
         liveAnnouncement,
         startListening,

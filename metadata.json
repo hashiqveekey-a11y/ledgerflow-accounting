@@ -1,6 +1,6 @@
 {
   "name": "LedgerFlow Accounting",
   "description": "AI-powered accounting software for retail shops and businesses. Features AI automated inventory, predictive customer purchasing insights, vendor & customer directories, real-time Balance Sheet, P&L, Assets & Liabilities, ledgers, voiceover voice commands, and cash flow tracking.",
-  "requestFramePermissions": ["microphone"],
+  "requestFramePermissions": ["microphone", "camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

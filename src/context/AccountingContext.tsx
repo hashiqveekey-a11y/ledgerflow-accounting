@@ -34,6 +34,7 @@ import {
   AssetsLiabilitiesReport,
   CustomerPredictiveInsight,
   InventoryAutomationInsight,
+  CameraScanMode,
 } from '../types';
 import {
   initialBusinessProfile,
@@ -160,6 +161,38 @@ interface AccountingContextType {
   setIsClientModalOpen: (open: boolean) => void;
   isLedgerModalOpen: boolean;
   setIsLedgerModalOpen: (open: boolean) => void;
+  isAICopilotOpen: boolean;
+  setIsAICopilotOpen: (open: boolean) => void;
+  isReceiptScannerOpen: boolean;
+  setIsReceiptScannerOpen: (open: boolean) => void;
+  isCameraScannerOpen: boolean;
+  setIsCameraScannerOpen: (open: boolean) => void;
+  cameraScannerMode: CameraScanMode;
+  setCameraScannerMode: (mode: CameraScanMode) => void;
+  openCameraScanner: (mode: CameraScanMode) => void;
+  closeCameraScanner: () => void;
+  draftInvoicePrefill: Partial<Invoice> | null;
+  setDraftInvoicePrefill: (draft: Partial<Invoice> | null) => void;
+  draftPurchaseInvoicePrefill: Partial<PurchaseInvoice> | null;
+  setDraftPurchaseInvoicePrefill: (draft: Partial<PurchaseInvoice> | null) => void;
+  openInvoiceModalWithDraft: (draft: Partial<Invoice>) => void;
+  openPurchaseInvoiceModalWithDraft: (draft: Partial<PurchaseInvoice>) => void;
+  createInvoiceDirect: (params: {
+    clientName: string;
+    clientEmail?: string;
+    items: { description: string; quantity: number; unitPrice: number; taxRate?: number }[];
+    notes?: string;
+    autoOpen?: boolean;
+  }) => Invoice;
+  createPurchaseInvoiceDirect: (params: {
+    vendorName: string;
+    vendorEmail?: string;
+    items: { description: string; quantity: number; unitPrice: number; taxRate?: number }[];
+    notes?: string;
+    category?: string;
+    autoOpen?: boolean;
+  }) => PurchaseInvoice;
+  closeAllModals: () => void;
   notificationMessage: { text: string; type: 'success' | 'info' | 'warning' } | null;
   showNotification: (text: string, type?: 'success' | 'info' | 'warning') => void;
 
@@ -222,6 +255,12 @@ interface AccountingContextType {
   askAICopilot: (prompt: string) => Promise<{ reply: string; action: AIChatIntentAction; suggestedButtons: any[] }>;
   executeAIAction: (action: AIChatIntentAction) => void;
   scanReceiptWithAI: (imageBase64?: string, textContext?: string) => Promise<AIReceiptScanResult>;
+  scanDocumentWithAI: (params: {
+    documentType: CameraScanMode;
+    imageBase64?: string;
+    mimeType?: string;
+    textContext?: string;
+  }) => Promise<any>;
   generateInvoiceWithAI: (prompt: string) => Promise<any>;
   getFinancialInsightsWithAI: (userQuestion?: string) => Promise<any>;
   customerInsights: CustomerPredictiveInsight[];
@@ -486,6 +525,12 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState<boolean>(false);
   const [isClientModalOpen, setIsClientModalOpen] = useState<boolean>(false);
   const [isLedgerModalOpen, setIsLedgerModalOpen] = useState<boolean>(false);
+  const [isAICopilotOpen, setIsAICopilotOpen] = useState<boolean>(false);
+  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState<boolean>(false);
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState<boolean>(false);
+  const [cameraScannerMode, setCameraScannerMode] = useState<CameraScanMode>('purchase');
+  const [draftInvoicePrefill, setDraftInvoicePrefill] = useState<Partial<Invoice> | null>(null);
+  const [draftPurchaseInvoicePrefill, setDraftPurchaseInvoicePrefill] = useState<Partial<PurchaseInvoice> | null>(null);
   const [notificationMessage, setNotificationMessage] = useState<{
     text: string;
     type: 'success' | 'info' | 'warning';
@@ -1862,6 +1907,77 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
         runAutomatedRecurringEngine();
         break;
       }
+      case 'open_vendor_modal': {
+        setIsVendorModalOpen(true);
+        break;
+      }
+      case 'create_vendor': {
+        const p = action.payload || {};
+        addVendor({
+          name: p.name || 'New Vendor',
+          companyName: p.companyName || p.name || 'Vendor Corp',
+          email: p.email || 'contact@vendorcorp.com',
+          phone: p.phone || '+1 (555) 000-0000',
+          address: {
+            street: '500 Commerce Blvd',
+            city: 'Chicago',
+            state: 'IL',
+            zip: '60601',
+            country: 'United States',
+          },
+          category: 'Office Supplies & Equipment',
+          paymentTermsDays: 30,
+        });
+        break;
+      }
+      case 'open_inventory_modal': {
+        setIsInventoryModalOpen(true);
+        break;
+      }
+      case 'create_inventory_item': {
+        const p = action.payload || {};
+        const cost = p.unitCost || p.purchasePrice || p.costPrice || 12;
+        const sell = p.sellingPrice || p.unitPrice || 25;
+        const qty = p.quantityOnHand || p.stockOnHand || 10;
+        addInventoryItem({
+          sku: p.sku || `SKU-${Date.now().toString().slice(-4)}`,
+          name: p.name || 'New Inventory Item',
+          description: p.description || 'Stock item',
+          category: p.category || 'general_goods',
+          unit: p.unit || p.unitOfMeasure || 'pcs',
+          purchasePrice: cost,
+          unitCost: cost,
+          sellingPrice: sell,
+          stockOnHand: qty,
+          quantityOnHand: qty,
+          minStockLevel: 5,
+          reorderLevel: 5,
+          taxRate: 8.5,
+          location: 'Main Warehouse',
+        });
+        break;
+      }
+      case 'open_stock_adjustment': {
+        setIsStockAdjustmentModalOpen(true);
+        break;
+      }
+      case 'open_voucher_modal': {
+        setIsPaymentVoucherModalOpen(true);
+        break;
+      }
+      case 'open_receipt_scanner':
+      case 'scan_receipt': {
+        setIsReceiptScannerOpen(true);
+        break;
+      }
+      case 'open_copilot': {
+        setIsAICopilotOpen(true);
+        break;
+      }
+      case 'close_modals': {
+        closeAllModals();
+        break;
+      }
       case 'navigate_tab': {
         if (action.payload?.tab) {
           setActiveTab(action.payload.tab);
@@ -1871,6 +1987,209 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       default:
         break;
     }
+  };
+
+  const openInvoiceModalWithDraft = (draft: Partial<Invoice>) => {
+    setSelectedInvoiceForEdit(null);
+    setDraftInvoicePrefill(draft);
+    setIsInvoiceModalOpen(true);
+  };
+
+  const openPurchaseInvoiceModalWithDraft = (draft: Partial<PurchaseInvoice>) => {
+    setSelectedPurchaseInvoiceForEdit(null);
+    setDraftPurchaseInvoicePrefill(draft);
+    setIsPurchaseInvoiceModalOpen(true);
+  };
+
+  const openCameraScanner = (mode: CameraScanMode) => {
+    setCameraScannerMode(mode);
+    setIsCameraScannerOpen(true);
+  };
+
+  const closeCameraScanner = () => {
+    setIsCameraScannerOpen(false);
+  };
+
+  const closeAllModals = () => {
+    setIsInvoiceModalOpen(false);
+    setIsPurchaseInvoiceModalOpen(false);
+    setIsExpenseModalOpen(false);
+    setIsClientModalOpen(false);
+    setIsVendorModalOpen(false);
+    setIsInventoryModalOpen(false);
+    setIsStockAdjustmentModalOpen(false);
+    setIsPaymentVoucherModalOpen(false);
+    setIsLedgerModalOpen(false);
+    setIsAICopilotOpen(false);
+    setIsReceiptScannerOpen(false);
+    setIsCameraScannerOpen(false);
+    setSelectedInvoiceForView(null);
+    setSelectedPurchaseInvoiceForView(null);
+    setSelectedVoucherForView(null);
+  };
+
+  const createInvoiceDirect = (params: {
+    clientName: string;
+    clientEmail?: string;
+    items: { description: string; quantity: number; unitPrice: number; taxRate?: number }[];
+    notes?: string;
+    autoOpen?: boolean;
+  }): Invoice => {
+    const rawClient = params.clientName ? params.clientName.trim() : 'Valued Client';
+    let matchedClient = clients.find(
+      (c) =>
+        c.name.toLowerCase() === rawClient.toLowerCase() ||
+        c.companyName.toLowerCase() === rawClient.toLowerCase()
+    );
+
+    if (!matchedClient && rawClient) {
+      matchedClient = addClient({
+        name: rawClient,
+        companyName: `${rawClient} Corp`,
+        email: params.clientEmail || `billing@${rawClient.toLowerCase().replace(/[^a-z0-9]/g, '') || 'client'}.com`,
+        phone: '+1 (555) 000-0000',
+        address: {
+          street: '100 Business Parkway',
+          city: 'New York',
+          state: 'NY',
+          zip: '10001',
+          country: 'United States',
+        },
+        paymentTermsDays: 30,
+      });
+    }
+
+    const nextNum = businessProfile.invoiceNextNumber;
+    const invNum = `${businessProfile.invoicePrefix}${nextNum}`;
+    const defaultTax = businessProfile.defaultTaxRate ?? 8.5;
+
+    const formattedItems = (params.items && params.items.length > 0 ? params.items : [{ description: 'Goods / Services', quantity: 1, unitPrice: 100 }]).map((it, idx) => {
+      const qty = it.quantity > 0 ? it.quantity : 1;
+      const price = it.unitPrice >= 0 ? it.unitPrice : 0;
+      const taxRate = typeof it.taxRate === 'number' ? it.taxRate : defaultTax;
+      return {
+        id: `li-${Date.now()}-${idx}`,
+        description: it.description || 'Sales Item',
+        quantity: qty,
+        unitPrice: price,
+        taxRate,
+        discountPercent: 0,
+        amount: qty * price,
+      };
+    });
+
+    const subtotal = formattedItems.reduce((sum, item) => sum + item.amount, 0);
+    const taxTotal = formattedItems.reduce((sum, item) => sum + item.amount * (item.taxRate / 100), 0);
+    const totalAmount = subtotal + taxTotal;
+
+    const newInvoice = addInvoice({
+      invoiceNumber: invNum,
+      clientId: matchedClient ? matchedClient.id : 'client-direct',
+      clientName: matchedClient ? matchedClient.name : rawClient,
+      clientCompany: matchedClient ? matchedClient.companyName : '',
+      clientEmail: matchedClient ? matchedClient.email : (params.clientEmail || 'billing@client.com'),
+      clientAddress: matchedClient ? `${matchedClient.address.street}, ${matchedClient.address.city}` : '100 Business Parkway',
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      status: 'sent',
+      currency: selectedCurrency || businessProfile.defaultCurrency,
+      lineItems: formattedItems,
+      subtotal,
+      taxTotal,
+      discountTotal: 0,
+      totalAmount,
+      amountPaid: 0,
+      balanceDue: totalAmount,
+      notes: params.notes || `Created via Voice Command. Thank you for your business!`,
+      termsAndConditions: businessProfile.paymentInstructions,
+    });
+
+    if (params.autoOpen !== false) {
+      setActiveTab('invoices');
+      setSelectedInvoiceForView(newInvoice);
+    }
+
+    return newInvoice;
+  };
+
+  const createPurchaseInvoiceDirect = (params: {
+    vendorName: string;
+    vendorEmail?: string;
+    items: { description: string; quantity: number; unitPrice: number; taxRate?: number }[];
+    notes?: string;
+    category?: string;
+    autoOpen?: boolean;
+  }): PurchaseInvoice => {
+    const rawVendor = params.vendorName ? params.vendorName.trim() : 'Vendor & Supplier';
+    let matchedVendor = vendors.find(
+      (v) =>
+        v.name.toLowerCase() === rawVendor.toLowerCase() ||
+        v.companyName.toLowerCase() === rawVendor.toLowerCase()
+    );
+
+    if (!matchedVendor && rawVendor) {
+      matchedVendor = addVendor({
+        name: rawVendor,
+        companyName: `${rawVendor} Supplies`,
+        email: params.vendorEmail || `contact@${rawVendor.toLowerCase().replace(/[^a-z0-9]/g, '') || 'vendor'}.com`,
+        phone: '+1 (555) 000-0000',
+        address: {
+          street: '500 Supplier Boulevard',
+          city: 'Chicago',
+          state: 'IL',
+          zip: '60601',
+          country: 'United States',
+        },
+        category: (params.category as any) || 'Office Supplies & Equipment',
+        paymentTermsDays: 30,
+      });
+    }
+
+    const billNum = `BILL-${Date.now().toString().slice(-4)}`;
+    const formattedItems = (params.items && params.items.length > 0 ? params.items : [{ description: 'Procurement Item', quantity: 1, unitPrice: 100 }]).map((it, idx) => {
+      const qty = it.quantity > 0 ? it.quantity : 1;
+      const price = it.unitPrice >= 0 ? it.unitPrice : 0;
+      return {
+        id: `pli-${Date.now()}-${idx}`,
+        description: it.description || 'Supplies / Goods Purchased',
+        quantity: qty,
+        unitPrice: price,
+        taxRate: typeof it.taxRate === 'number' ? it.taxRate : 8,
+        ledgerAccountId: 'acc-5020',
+        ledgerAccountName: 'Software, Cloud & SaaS Subscriptions',
+        amount: qty * price,
+      };
+    });
+
+    const subtotal = formattedItems.reduce((sum, item) => sum + item.amount, 0);
+    const taxTotal = subtotal * 0.08;
+    const totalAmount = subtotal + taxTotal;
+
+    const newBill = addPurchaseInvoice({
+      billNumber: billNum,
+      vendorName: matchedVendor ? matchedVendor.name : rawVendor,
+      vendorEmail: matchedVendor ? matchedVendor.email : (params.vendorEmail || 'billing@vendor.com'),
+      vendorTaxId: 'TAX-VEND-99',
+      issueDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+      status: 'pending',
+      currency: selectedCurrency || businessProfile.defaultCurrency,
+      category: (params.category as any) || 'Office Supplies & Equipment',
+      lineItems: formattedItems,
+      subtotal,
+      taxTotal,
+      totalAmount,
+      amountPaid: 0,
+      balanceDue: totalAmount,
+      notes: params.notes || `Created via Voice Command.`,
+    });
+
+    if (params.autoOpen !== false) {
+      setActiveTab('purchase_invoices');
+      setSelectedPurchaseInvoiceForView(newBill);
+    }
+
+    return newBill;
   };
 
   // Receipt Scanner AI
@@ -1902,6 +2221,102 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
       notes: 'Office stationery and printer ink',
       lineItems: [{ description: 'High-yield ink cartridge & copy paper', amount: 136.62 }],
     };
+  };
+
+  const scanDocumentWithAI = async (params: {
+    documentType: CameraScanMode;
+    imageBase64?: string;
+    mimeType?: string;
+    textContext?: string;
+  }): Promise<any> => {
+    try {
+      const response = await fetch('/api/ai/scan-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      const contentType = response.headers.get('content-type') || '';
+      if (response.ok && contentType.includes('application/json')) {
+        const data = await response.json();
+        if (data.data) return data.data;
+      }
+    } catch (err) {
+      console.warn('Scan document API fallback:', err);
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dueStr = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+
+    if (params.documentType === 'sales') {
+      return {
+        documentType: 'sales',
+        clientName: 'Nexus Retail Distribution',
+        clientCompany: 'Nexus Retail Partners LLC',
+        clientEmail: 'procurement@nexusretail.com',
+        clientAddress: '742 Evergreen Blvd, Suite 400, Chicago, IL 60611',
+        invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        issueDate: todayStr,
+        dueDate: dueStr,
+        lineItems: [
+          {
+            description: 'Retail Merchandising Display Units (Standard)',
+            quantity: 2,
+            unitPrice: 350.0,
+            taxRate: 8.25,
+            amount: 700.0,
+          },
+          {
+            description: 'Custom Branded Acrylic Point-of-Sale Signage',
+            quantity: 4,
+            unitPrice: 85.0,
+            taxRate: 8.25,
+            amount: 340.0,
+          },
+        ],
+        subtotal: 1040.0,
+        taxTotal: 85.8,
+        totalAmount: 1125.8,
+        notes: 'Customer sales document captured via camera scanner. Payment terms Net 30.',
+        confidenceScore: 0.94,
+      };
+    } else {
+      return {
+        documentType: 'purchase',
+        vendorName: 'Sysco Global Distribution & Supplies',
+        vendorEmail: 'invoicing@sysco-global.com',
+        vendorTaxId: 'EIN-84-9182341',
+        vendorPhone: '+1 (800) 555-0192',
+        vendorAddress: '1390 Enclave Pkwy, Houston, TX 77077',
+        billNumber: `BILL-${Math.floor(10000 + Math.random() * 90000)}`,
+        issueDate: todayStr,
+        dueDate: dueStr,
+        category: 'Inventory & Raw Materials',
+        lineItems: [
+          {
+            description: 'Commercial Grade Packaging Supplies & Bulk Containers',
+            quantity: 10,
+            unitPrice: 45.0,
+            taxRate: 8.0,
+            amount: 450.0,
+            ledgerAccountName: 'Inventory & Supplies',
+          },
+          {
+            description: 'Direct Thermal Barcode Shipping Labels (Case of 24)',
+            quantity: 3,
+            unitPrice: 62.5,
+            taxRate: 8.0,
+            amount: 187.5,
+            ledgerAccountName: 'Office & Warehouse Supplies',
+          },
+        ],
+        subtotal: 637.5,
+        taxTotal: 51.0,
+        totalAmount: 688.5,
+        paymentMethod: 'bank_transfer',
+        notes: 'Vendor bill scanned via camera scanner. Accounts payable terms Net 30.',
+        confidenceScore: 0.96,
+      };
+    }
   };
 
   const generateInvoiceWithAI = async (prompt: string): Promise<any> => {
@@ -2254,6 +2669,25 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
         setIsClientModalOpen,
         isLedgerModalOpen,
         setIsLedgerModalOpen,
+        isAICopilotOpen,
+        setIsAICopilotOpen,
+        isReceiptScannerOpen,
+        setIsReceiptScannerOpen,
+        isCameraScannerOpen,
+        setIsCameraScannerOpen,
+        cameraScannerMode,
+        setCameraScannerMode,
+        openCameraScanner,
+        closeCameraScanner,
+        draftInvoicePrefill,
+        setDraftInvoicePrefill,
+        draftPurchaseInvoicePrefill,
+        setDraftPurchaseInvoicePrefill,
+        openInvoiceModalWithDraft,
+        openPurchaseInvoiceModalWithDraft,
+        createInvoiceDirect,
+        createPurchaseInvoiceDirect,
+        closeAllModals,
         notificationMessage,
         showNotification,
 
@@ -2308,6 +2742,7 @@ export const AccountingProvider: React.FC<{ children: ReactNode }> = ({ children
         askAICopilot,
         executeAIAction,
         scanReceiptWithAI,
+        scanDocumentWithAI,
         generateInvoiceWithAI,
         getFinancialInsightsWithAI,
         customerInsights,

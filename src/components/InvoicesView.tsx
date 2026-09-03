@@ -20,6 +20,7 @@ import {
   DollarSign,
   ArrowUpDown,
   Receipt,
+  Camera,
 } from 'lucide-react';
 import { formatCurrency } from '../utils/accountingMath';
 
@@ -38,6 +39,7 @@ export const InvoicesView: React.FC<{
     sendInvoiceReminder,
     runAutomatedRecurringEngine,
     openPaymentModalForInvoice,
+    openCameraScanner,
   } = useAccounting();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,6 +143,16 @@ export const InvoicesView: React.FC<{
           >
             <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isAutomationRunning ? 'animate-spin' : ''}`} />
             <span>Run Automation Engine</span>
+          </button>
+
+          <button
+            id="invoices-camera-scan-btn"
+            onClick={() => openCameraScanner('sales')}
+            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300/70 text-xs font-semibold rounded-xl transition-all flex items-center gap-1.5 shadow-xs"
+            title="Scan customer sales invoice or slip with camera"
+          >
+            <Camera className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Camera Scan</span>
           </button>
 
           <button

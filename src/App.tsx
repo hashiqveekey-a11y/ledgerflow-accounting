@@ -12,6 +12,7 @@ import { PurchaseInvoiceDetailModal } from './components/PurchaseInvoiceDetailMo
 import { ExpensesView } from './components/ExpensesView';
 import { ExpenseModal } from './components/ExpenseModal';
 import { ReceiptScannerModal } from './components/ReceiptScannerModal';
+import { CameraDocumentScannerModal } from './components/CameraDocumentScannerModal';
 import { FinancialReportsView } from './components/FinancialReportsView';
 import { BankReconciliationView } from './components/BankReconciliationView';
 import { ClientsView } from './components/ClientsView';
@@ -53,6 +54,10 @@ const MainLayout: React.FC = () => {
     setSelectedPurchaseInvoiceForEdit,
     isLedgerModalOpen,
     setIsLedgerModalOpen,
+    isAICopilotOpen,
+    setIsAICopilotOpen,
+    isReceiptScannerOpen,
+    setIsReceiptScannerOpen,
     isAuthenticated,
     isSessionLocked,
   } = useAccounting();
@@ -60,8 +65,6 @@ const MainLayout: React.FC = () => {
   const { isVoiceWidgetOpen, setIsVoiceWidgetOpen } = useVoice();
 
   // Modal states
-  const [isAICopilotOpen, setIsAICopilotOpen] = useState(false);
-  const [isReceiptScannerOpen, setIsReceiptScannerOpen] = useState(false);
   const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
   const [clientToEdit, setClientToEdit] = useState<Client | null>(null);
   const [vendorToEdit, setVendorToEdit] = useState<Vendor | null>(null);
@@ -230,6 +233,7 @@ const MainLayout: React.FC = () => {
         isOpen={isReceiptScannerOpen}
         onClose={() => setIsReceiptScannerOpen(false)}
       />
+      <CameraDocumentScannerModal />
       <ClientModal
         clientToEdit={clientToEdit}
         onClose={handleCloseClientModal}

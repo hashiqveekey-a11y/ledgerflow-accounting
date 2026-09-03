@@ -149,11 +149,13 @@ export function calculateProfitAndLoss(
     totalRevenue,
     revenueByClient,
     cogs,
+    costOfGoodsSold: cogs,
     grossProfit,
     grossMarginPercentage,
     operatingExpenses,
     totalExpenses,
     ebitda,
+    operatingIncome: ebitda,
     estimatedTaxProvision,
     netIncome,
     netProfitMarginPercentage,
@@ -327,6 +329,13 @@ export function calculateCashFlow(
     endingCash,
     burnRateMonthly: monthlyExpenseBurn,
     runwayMonths: Math.round(runwayMonths * 10) / 10,
+    // Convenience projection aliases for UI & exports
+    operatingActivities: {
+      netOperatingCash,
+      netCashFromOperations: netOperatingCash,
+    },
+    netChangeInCash: netCashIncrease,
+    cashAtEndOfPeriod: endingCash,
   };
 }
 
@@ -574,12 +583,14 @@ export function calculateDaybook(
       referenceNumber: inv.invoiceNumber,
       partyName: inv.clientName || 'Client',
       account: 'Accounts Receivable (1020) / Sales Revenue (4010)',
+      accountOrEntity: inv.clientName || 'Client',
       description: `Sales Invoice issued to ${inv.clientName}`,
       debit: inv.totalAmount,
       credit: 0,
       netEffect: inv.totalAmount,
       sourceId: inv.id,
       sourceType: 'invoice',
+      status: 'Posted',
     });
   });
 
@@ -595,12 +606,14 @@ export function calculateDaybook(
       referenceNumber: bill.billNumber,
       partyName: bill.vendorName || 'Vendor',
       account: `Accounts Payable (2010) / ${bill.category}`,
+      accountOrEntity: bill.vendorName || 'Vendor',
       description: `Vendor Bill received from ${bill.vendorName}`,
       debit: 0,
       credit: bill.totalAmount,
       netEffect: -bill.totalAmount,
       sourceId: bill.id,
       sourceType: 'purchase_invoice',
+      status: 'Posted',
     });
   });
 
@@ -616,12 +629,14 @@ export function calculateDaybook(
         referenceNumber: v.voucherNumber,
         partyName: v.partyName,
         account: `${v.bankAccountName || 'Bank (1010)'} / A/R (1020)`,
+        accountOrEntity: v.partyName,
         description: `Payment Receipt: Received funds from ${v.partyName} ${v.allocatedInvoiceNumber ? `for ${v.allocatedInvoiceNumber}` : ''}`,
         debit: v.amount,
         credit: 0,
         netEffect: v.amount,
         sourceId: v.id,
         sourceType: 'payment_voucher',
+        status: 'Posted',
       });
     } else {
       entries.push({
@@ -632,12 +647,14 @@ export function calculateDaybook(
         referenceNumber: v.voucherNumber,
         partyName: v.partyName,
         account: `A/P (2010) / ${v.bankAccountName || 'Bank (1010)'}`,
+        accountOrEntity: v.partyName,
         description: `Bill Payment: Paid ${v.partyName} ${v.allocatedInvoiceNumber ? `for ${v.allocatedInvoiceNumber}` : ''}`,
         debit: 0,
         credit: v.amount,
         netEffect: -v.amount,
         sourceId: v.id,
         sourceType: 'payment_voucher',
+        status: 'Posted',
       });
     }
   });
@@ -653,12 +670,14 @@ export function calculateDaybook(
       referenceNumber: exp.expenseNumber,
       partyName: exp.payee || 'Expense Payee',
       account: `${exp.category} / Operating Cash (1010)`,
+      accountOrEntity: exp.payee || exp.category,
       description: `Expense Payment to ${exp.payee} (${exp.category})`,
       debit: 0,
       credit: exp.amount,
       netEffect: -exp.amount,
       sourceId: exp.id,
       sourceType: 'expense',
+      status: 'Posted',
     });
   });
 
@@ -672,6 +691,8 @@ export function calculateDaybook(
     date: filterDate || new Date().toISOString().split('T')[0],
     totalDebits,
     totalCredits,
+    totalDebit: totalDebits,
+    totalCredit: totalCredits,
     netDayBalance: totalDebits - totalCredits,
     entryCount: entries.length,
     entries,
@@ -718,8 +739,10 @@ export function calculateSalesReport(
       clientName,
       invoiceCount: d.count,
       totalAmount: d.total,
+      totalInvoiced: d.total,
       amountPaid: d.paid,
       outstanding: d.outstanding,
+      balanceDue: d.outstanding,
       percentage: totalSales > 0 ? (d.total / totalSales) * 100 : 0,
     }))
     .sort((a, b) => b.totalAmount - a.totalAmount);
@@ -771,6 +794,9 @@ export function calculateSalesReport(
     totalOutstandingAR,
     totalTaxCollected,
     invoiceCount: filtered.length,
+    totalInvoices: filtered.length,
+    paidSales: totalCollected,
+    unpaidSales: totalOutstandingAR,
     paidInvoiceCount: filtered.filter((i) => i.status === 'paid').length,
     overdueInvoiceCount: filtered.filter((i) => i.status === 'overdue').length,
     averageInvoiceValue: filtered.length > 0 ? totalSales / filtered.length : 0,
@@ -821,6 +847,7 @@ export function calculatePurchaseReport(
       vendorName,
       billCount: d.count,
       totalAmount: d.total,
+      totalBilled: d.total,
       amountPaid: d.paid,
       balanceDue: d.balance,
       percentage: totalPurchases > 0 ? (d.total / totalPurchases) * 100 : 0,
@@ -872,6 +899,10 @@ export function calculatePurchaseReport(
     totalOutstandingAP,
     totalInputTax,
     billCount: filteredBills.length,
+    totalBills: filteredBills.length,
+    paidPurchases: totalPaid,
+    unpaidPurchases: totalOutstandingAP,
+    totalTaxPaid: totalInputTax,
     paidBillCount: filteredBills.filter((b) => b.status === 'paid').length,
     overdueBillCount: filteredBills.filter((b) => b.status === 'overdue').length,
     averageBillValue: filteredBills.length > 0 ? totalPurchases / filteredBills.length : 0,
@@ -973,6 +1004,15 @@ export function calculateTaxReport(
     deductibleAmount: (d.gross * d.pct) / 100,
   }));
 
+  const totalDeductibleExpenses = deductibleExpenseSchedule.reduce((sum, d) => sum + d.deductibleAmount, 0);
+  const estimatedTaxableIncome = Math.max(0, taxableSalesBase - totalDeductibleExpenses);
+  const deductionsByCategory = deductibleExpenseSchedule.map((d) => ({
+    category: d.category,
+    amount: d.deductibleAmount,
+    grossAmount: d.grossAmount,
+    deductiblePercentage: d.deductiblePercentage,
+  }));
+
   return {
     taxYear,
     taxPeriod: `Jan 01, ${taxYear} - Dec 31, ${taxYear}`,
@@ -985,6 +1025,13 @@ export function calculateTaxReport(
     effectiveTaxRatePercentage,
     breakdownByRate,
     deductibleExpenseSchedule,
+    // Convenience aliases for UI & exports
+    totalOutputTax: salesTaxCollected,
+    totalInputTax: totalInputTaxCredit,
+    netTaxLiability: netTaxPayableOrRefund,
+    totalDeductibleExpenses,
+    estimatedTaxableIncome,
+    deductionsByCategory,
   };
 }
 
@@ -997,27 +1044,36 @@ export function calculateInventoryReport(
 ): InventoryReportSummary {
   const asOfDate = new Date().toISOString().split('T')[0];
 
-  const itemsList = inventoryItems.map((item) => {
-    const totalValue = item.stockOnHand * item.purchasePrice;
-    const potentialRevenue = item.stockOnHand * item.sellingPrice;
-    const profitMarginPercent = item.sellingPrice > 0 ? ((item.sellingPrice - item.purchasePrice) / item.sellingPrice) * 100 : 0;
+  const itemsList = (inventoryItems || []).map((item) => {
+    const stockQty = typeof (item as any).stockOnHand === 'number' ? (item as any).stockOnHand : ((item as any).quantityOnHand || 0);
+    const pPrice = typeof item.purchasePrice === 'number' ? item.purchasePrice : ((item as any).unitCost || 0);
+    const sPrice = typeof item.sellingPrice === 'number' ? item.sellingPrice : 0;
+    const totalValue = stockQty * pPrice;
+    const potentialRevenue = stockQty * sPrice;
+    const profitMarginPercent = sPrice > 0 ? ((sPrice - pPrice) / sPrice) * 100 : 0;
     return {
       ...item,
+      stockOnHand: stockQty,
+      purchasePrice: pPrice,
+      sellingPrice: sPrice,
       totalValue,
       potentialRevenue,
       profitMarginPercent,
     };
   });
 
-  const totalSkus = inventoryItems.length;
-  const totalStockUnits = inventoryItems.reduce((sum, item) => sum + Math.max(0, item.stockOnHand), 0);
+  const totalSkus = itemsList.length;
+  const totalStockUnits = itemsList.reduce((sum, item) => sum + Math.max(0, item.stockOnHand), 0);
   const totalValuationCost = itemsList.reduce((sum, item) => sum + item.totalValue, 0);
   const totalPotentialRetailValue = itemsList.reduce((sum, item) => sum + item.potentialRevenue, 0);
   const totalUnrealizedGrossProfit = totalPotentialRetailValue - totalValuationCost;
   const overallAverageGrossMarginPercent = totalPotentialRetailValue > 0 ? (totalUnrealizedGrossProfit / totalPotentialRetailValue) * 100 : 0;
 
-  const lowStockAlerts = inventoryItems.filter((item) => item.stockOnHand > 0 && item.stockOnHand <= item.minStockLevel);
-  const outOfStockItemsCount = inventoryItems.filter((item) => item.stockOnHand <= 0).length;
+  const lowStockAlerts = itemsList.filter((item) => {
+    const minLvl = typeof (item as any).minStockLevel === 'number' ? (item as any).minStockLevel : ((item as any).reorderLevel || 5);
+    return item.stockOnHand > 0 && item.stockOnHand <= minLvl;
+  });
+  const outOfStockItemsCount = itemsList.filter((item) => item.stockOnHand <= 0).length;
 
   // Group by category
   const catMap: Record<string, { count: number; units: number; val: number }> = {};
@@ -1050,6 +1106,12 @@ export function calculateInventoryReport(
     categoryValuation,
     lowStockAlerts,
     itemsList,
+    // Convenience aliases for UI & exports
+    totalInventoryValue: totalValuationCost,
+    totalUnitsOnHand: totalStockUnits,
+    potentialRetailValue: totalPotentialRetailValue,
+    potentialGrossMargin: totalUnrealizedGrossProfit,
+    lowStockItemCount: lowStockAlerts.length,
   };
 }
 
@@ -1113,6 +1175,30 @@ export function calculateAllInOneReport(
     taxReport,
     inventoryReport,
     daybookSnapshot,
+    // Convenience projection aliases for UI & exports
+    sales: {
+      ...salesReport,
+      totalRevenue: salesReport.totalSales,
+      totalInvoicesCount: salesReport.invoiceCount,
+    },
+    purchases: {
+      ...purchaseReport,
+      totalBillsCount: purchaseReport.billCount,
+    },
+    tax: {
+      ...taxReport,
+      totalOutputTax: taxReport.salesTaxCollected,
+      totalInputTax: taxReport.totalInputTaxCredit,
+      netTaxLiability: taxReport.netTaxPayableOrRefund,
+    },
+    inventory: {
+      ...inventoryReport,
+      totalInventoryValue: inventoryReport.totalValuationCost,
+      totalUnitsOnHand: inventoryReport.totalStockUnits,
+      potentialRetailValue: inventoryReport.totalPotentialRetailValue,
+      potentialGrossMargin: inventoryReport.totalUnrealizedGrossProfit,
+    },
+    daybook: daybookSnapshot,
   };
 }
 
@@ -1215,6 +1301,28 @@ export function calculateAssetsLiabilitiesReport(
       quickRatio,
       debtToEquityRatio,
       solvencyRatio,
+    },
+    // Convenience projection aliases for UI & exports
+    netWorth: totalEquity,
+    workingCapital,
+    currentRatio,
+    assets: {
+      cashAndEquivalents,
+      accountsReceivable,
+      inventoryValue: inventoryValuation,
+      otherCurrentAssets: prepaidExpenses,
+      currentAssetsTotal: totalCurrentAssets,
+      fixedAssets: totalNonCurrentAssets,
+      totalAssets,
+    },
+    liabilities: {
+      accountsPayable,
+      salesTaxPayable: shortTermTaxPayable,
+      accruedExpenses,
+      shortTermLoans: 0,
+      currentLiabilitiesTotal: totalCurrentLiabilities,
+      longTermLiabilities: totalLongTermLiabilities,
+      totalLiabilities,
     },
   };
 }
